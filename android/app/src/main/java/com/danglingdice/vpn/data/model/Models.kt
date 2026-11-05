@@ -33,3 +33,4 @@ data class LeakReport(
     val isVpnSecured: Boolean = false,
     val serverNode: String = "Direct Link"
 )
+

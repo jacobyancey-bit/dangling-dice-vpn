@@ -16,3 +16,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "DanglingDiceVPN"
 include(":app")
+

@@ -114,3 +114,4 @@ fun KillSwitchScreen(
         }
     }
 }
+

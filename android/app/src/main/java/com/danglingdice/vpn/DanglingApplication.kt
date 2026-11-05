@@ -21,3 +21,4 @@ class DanglingApplication : Application() {
             private set
     }
 }
+

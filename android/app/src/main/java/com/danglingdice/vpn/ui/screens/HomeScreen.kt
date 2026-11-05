@@ -255,3 +255,4 @@ fun formatDuration(seconds: Long): String {
     val secs = seconds % 60
     return if (hrs > 0) String.format("%02d:%02d:%02d", hrs, mins, secs) else String.format("%02d:%02d", mins, secs)
 }
+

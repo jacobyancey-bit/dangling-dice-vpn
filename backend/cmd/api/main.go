@@ -99,6 +99,11 @@ func main() {
 		r.Get("/tools/diagnostics", state.handleDiagnostics)
 		r.Post("/peers/register", state.handleRegisterPeer)
 		r.Post("/tools/guest-config", state.handleGenerateGuestConfig)
+
+		// Single Source of Truth (SSOT): Telemetry, Attribution & A/B Testing
+		r.Post("/telemetry/event", state.handleTrackEvent)
+		r.Get("/experiments/variant", state.handleGetExperimentVariant)
+		r.Get("/admin/analytics", state.handleGetAnalyticsSummary)
 	})
 
 	log.Printf("Dangling Dice Control Plane running on port %s", cfg.APIPort)
@@ -232,6 +237,164 @@ PersistentKeepalive = 25
 		"config_text": rawConf,
 		"expires_in":  "24 hours",
 	})
+}
+
+type TelemetryEventRequest struct {
+	EventName       string                 `json:"event_name"`
+	SessionID       string                 `json:"session_id"`
+	Platform        string                 `json:"platform"`
+	ExperimentKey   string                 `json:"experiment_key,omitempty"`
+	VariantAssigned string                 `json:"variant_assigned,omitempty"`
+	UTMSource       string                 `json:"utm_source,omitempty"`
+	UTMCampaign     string                 `json:"utm_campaign,omitempty"`
+	Metadata        map[string]interface{} `json:"metadata,omitempty"`
+}
+
+// Handler: Ingest Telemetry Event (SSOT)
+func (s *ServerState) handleTrackEvent(w http.ResponseWriter, r *http.Request) {
+	var req TelemetryEventRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.EventName == "" {
+		jsonError(w, http.StatusBadRequest, "Invalid payload. 'event_name' is required.")
+		return
+	}
+
+	clientIP := r.Header.Get("X-Real-IP")
+	if clientIP == "" {
+		clientIP = r.RemoteAddr
+	}
+	userAgent := r.UserAgent()
+
+	// Persist to PostgreSQL asynchronously
+	go func(event TelemetryEventRequest, ip, ua string) {
+		if s.db == nil {
+			return
+		}
+		metaJSON, _ := json.Marshal(event.Metadata)
+		query := `INSERT INTO telemetry_events 
+			(event_name, session_id, platform, experiment_key, variant_assigned, utm_source, utm_campaign, client_ip, user_agent, metadata)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`
+		_, err := s.db.Exec(query,
+			event.EventName,
+			event.SessionID,
+			event.Platform,
+			event.ExperimentKey,
+			event.VariantAssigned,
+			event.UTMSource,
+			event.UTMCampaign,
+			ip,
+			ua,
+			metaJSON,
+		)
+		if err != nil {
+			log.Printf("Telemetry insert error: %v", err)
+		}
+	}(req, clientIP, userAgent)
+
+	jsonResponse(w, http.StatusOK, map[string]interface{}{"status": "recorded"})
+}
+
+// Handler: A/B Testing Deterministic Variant Assignment
+func (s *ServerState) handleGetExperimentVariant(w http.ResponseWriter, r *http.Request) {
+	experiment := r.URL.Query().Get("experiment")
+	sessionID := r.URL.Query().Get("session_id")
+
+	if experiment == "" {
+		experiment = "vpn_hero_cta"
+	}
+	if sessionID == "" {
+		sessionID = r.RemoteAddr
+	}
+
+	// Deterministic variant assignment based on session hash
+	hash := 0
+	for _, char := range sessionID {
+		hash = (hash*31 + int(char)) % 100
+	}
+
+	variant := "variant_a"
+	if hash >= 50 {
+		variant = "variant_b"
+	}
+
+	jsonResponse(w, http.StatusOK, map[string]interface{}{
+		"experiment_key":   experiment,
+		"variant_assigned": variant,
+		"session_id":       sessionID,
+	})
+}
+
+// Handler: Single Source of Truth Analytics & Funnel Dashboard
+func (s *ServerState) handleGetAnalyticsSummary(w http.ResponseWriter, r *http.Request) {
+	summary := map[string]interface{}{
+		"total_events":      0,
+		"funnel": map[string]int{
+			"page_views":         0,
+			"leak_tests_run":     0,
+			"profiles_generated": 0,
+			"android_downloads":  0,
+			"vpn_handshakes":     0,
+		},
+		"ad_sources":   map[string]int{},
+		"ab_variants":  map[string]int{},
+		"last_updated": time.Now().UTC(),
+	}
+
+	if s.db != nil {
+		// Aggregate funnel counts
+		rows, err := s.db.Query(`
+			SELECT event_name, COUNT(*) 
+			FROM telemetry_events 
+			GROUP BY event_name`)
+		if err == nil {
+			defer rows.Close()
+			funnelMap := summary["funnel"].(map[string]int)
+			for rows.Next() {
+				var name string
+				var count int
+				if err := rows.Scan(&name, &count); err == nil {
+					funnelMap[name] = count
+				}
+			}
+		}
+
+		// Aggregate traffic by ad UTM source
+		utmRows, err := s.db.Query(`
+			SELECT COALESCE(NULLIF(utm_source, ''), 'direct') as src, COUNT(*) 
+			FROM telemetry_events 
+			GROUP BY src 
+			ORDER BY COUNT(*) DESC LIMIT 10`)
+		if err == nil {
+			defer utmRows.Close()
+			utmSources := summary["ad_sources"].(map[string]int)
+			for utmRows.Next() {
+				var src string
+				var count int
+				if err := utmRows.Scan(&src, &count); err == nil {
+					utmSources[src] = count
+				}
+			}
+		}
+
+		// Aggregate A/B test conversion
+		abRows, err := s.db.Query(`
+			SELECT COALESCE(NULLIF(variant_assigned, ''), 'none') as variant, COUNT(*) 
+			FROM telemetry_events 
+			WHERE event_name = 'profile_gen' 
+			GROUP BY variant`)
+		if err == nil {
+			defer abRows.Close()
+			abVariants := summary["ab_variants"].(map[string]int)
+			for abRows.Next() {
+				var variant string
+				var count int
+				if err := abRows.Scan(&variant, &count); err == nil {
+					abVariants[variant] = count
+				}
+			}
+		}
+	}
+
+	jsonResponse(w, http.StatusOK, summary)
 }
 
 // Helpers

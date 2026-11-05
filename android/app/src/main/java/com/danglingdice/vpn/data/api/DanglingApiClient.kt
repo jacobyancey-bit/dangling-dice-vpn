@@ -65,10 +65,27 @@ class DanglingApiClient(
                 val json = JSONObject(res.body?.string() ?: "")
                 val assignedIp = json.optString("assigned_ip", "10.8.0.2/24")
                 val serverPubKey = json.optString("server_public_key")
+                trackEvent("peer_registered", mapOf("device" to deviceName))
                 return@withContext Pair(assignedIp, serverPubKey)
             }
         } catch (_: Exception) {}
         return@withContext null
+    }
+
+    suspend fun trackEvent(eventName: String, metadata: Map<String, String> = emptyMap()) = withContext(Dispatchers.IO) {
+        try {
+            val payload = JSONObject().apply {
+                put("event_name", eventName)
+                put("session_id", "android_" + android.os.Build.ID)
+                put("platform", "android_app")
+                put("metadata", JSONObject(metadata))
+            }
+            val req = Request.Builder()
+                .url("$baseUrl/api/v1/telemetry/event")
+                .post(payload.toString().toRequestBody(jsonMedia))
+                .build()
+            client.newCall(req).execute().close()
+        } catch (_: Exception) {}
     }
 
     suspend fun fetchDiagnostics(): LeakReport = withContext(Dispatchers.IO) {
@@ -98,3 +115,4 @@ class DanglingApiClient(
         )
     )
 }
+

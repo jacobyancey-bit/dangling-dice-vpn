@@ -101,3 +101,4 @@ Test-Breakpoint "Breakpoint 5: WireGuard UDP Socket Reachability" {
 Write-Host "`n==========================================================" -ForegroundColor Cyan
 Write-Host " Diagnostic Summary: $Passed Passed, $Failed Failed" -ForegroundColor $(if ($Failed -eq 0) { "Green" } else { "Red" })
 Write-Host "==========================================================" -ForegroundColor Cyan
+

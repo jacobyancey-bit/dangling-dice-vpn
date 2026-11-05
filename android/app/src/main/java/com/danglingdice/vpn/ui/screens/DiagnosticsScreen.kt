@@ -143,3 +143,4 @@ fun DiagnosticRow(title: String, value: String) {
         Text(text = value, color = Color.White, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 13.sp)
     }
 }
+

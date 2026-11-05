@@ -107,6 +107,7 @@ class WireGuardTunnelManager(
                 // 4. Activate in-kernel / GoBackend tunnel
                 connectionStartTime = System.currentTimeMillis()
                 DanglingApplication.instance.wireGuardBackend.setState(tunnel, Tunnel.State.UP, config)
+                apiClient.trackEvent("vpn_handshake", mapOf("node" to server.id))
 
             } catch (e: Exception) {
                 _status.value = ConnectionStatus.DISCONNECTED
@@ -151,3 +152,4 @@ class WireGuardTunnelManager(
         _stats.value = TunnelStats()
     }
 }
+
