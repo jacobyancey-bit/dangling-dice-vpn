@@ -7,6 +7,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AltRoute
@@ -17,6 +18,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import com.danglingdice.vpn.data.model.ConnectionStatus
 import com.danglingdice.vpn.data.model.ServerNode
 import com.danglingdice.vpn.ui.screens.*
@@ -70,11 +72,15 @@ fun MainAppScaffold(
 ) {
     var selectedTab by remember { mutableStateOf(0) }
     var showLocationPicker by remember { mutableStateOf(false) }
+    var showPrivacyDialog by remember { mutableStateOf(false) }
     val status by tunnelManager.status.collectAsState()
     val statusDetail by tunnelManager.statusDetail.collectAsState()
     val stats by tunnelManager.stats.collectAsState()
     val excludedApps by tunnelManager.excludedApps.collectAsState()
     val availableServers by tunnelManager.servers.collectAsState()
+    val adBlockEnabled by tunnelManager.adBlockEnabled.collectAsState()
+    val accountToken by tunnelManager.accountToken.collectAsState()
+    val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
 
     var selectedServer by remember {
         mutableStateOf(com.danglingdice.vpn.data.model.defaultServerLocations().first())
@@ -151,6 +157,10 @@ fun MainAppScaffold(
                     statusDetail = statusDetail,
                     stats = stats,
                     selectedServer = selectedServer,
+                    adBlockEnabled = adBlockEnabled,
+                    accountToken = accountToken,
+                    onToggleAdBlock = { enabled -> tunnelManager.setAdBlockEnabled(enabled) },
+                    onPrivacyClick = { showPrivacyDialog = true },
                     onToggleConnection = {
                         if (status == ConnectionStatus.CONNECTED || status == ConnectionStatus.VERIFYING_HANDSHAKE || status == ConnectionStatus.CONNECTING) {
                             tunnelManager.disconnect()
@@ -259,6 +269,58 @@ fun MainAppScaffold(
                     confirmButton = {
                         TextButton(onClick = { showLocationPicker = false }) {
                             Text("Close", color = Emerald500)
+                        }
+                    }
+                )
+            }
+
+            if (showPrivacyDialog) {
+                AlertDialog(
+                    onDismissRequest = { showPrivacyDialog = false },
+                    containerColor = Slate900,
+                    titleContentColor = Color.White,
+                    title = {
+                        Text(
+                            text = "🛡️ Zero-Login Identity & Privacy",
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                            color = Color.White
+                        )
+                    },
+                    text = {
+                        androidx.compose.foundation.layout.Column(
+                            verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(10.dp)
+                        ) {
+                            Text(
+                                text = "Anonymous Hardware Passkey: $accountToken",
+                                color = Emerald500,
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            Text(
+                                text = "Dangling Dice VPN uses the Android VpnService API to create an encrypted WireGuard (ChaCha20-Poly1305) tunnel to our gateway servers. Your Curve25519 private key never leaves this device.",
+                                color = Slate400,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            Text(
+                                text = "• Zero Activity Logs: We never log browsing history, DNS queries, or traffic contents.\n• Local Split-Tunneling: Installed app lists stay 100% on your device.",
+                                color = Color.White,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(
+                            onClick = {
+                                showPrivacyDialog = false
+                                uriHandler.openUri("https://vpn.danglingdicestudios.duckdns.org/privacy")
+                            }
+                        ) {
+                            Text("Privacy Policy ↗", color = Emerald500)
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(onClick = { showPrivacyDialog = false }) {
+                            Text("Done", color = Color.White)
                         }
                     }
                 )

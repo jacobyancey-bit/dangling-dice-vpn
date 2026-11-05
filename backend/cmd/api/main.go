@@ -76,6 +76,7 @@ func main() {
 		state.db, err = sql.Open("postgres", cfg.PostgresDSN)
 		if err == nil && state.db.Ping() == nil {
 			log.Println("Successfully connected to PostgreSQL database")
+			state.rehydratePeersFromDB()
 			break
 		}
 		log.Println("Waiting for database to be ready...")
@@ -396,6 +397,7 @@ func (s *ServerState) handleRegisterPeer(w http.ResponseWriter, r *http.Request)
 
 	// Apply synchronously to the host's WireGuard interface (wg0) before returning 200 OK
 	s.applyWireGuardPeer(req.PublicKey, assignedIP)
+	s.persistPeerToDB(req.DeviceName, req.PublicKey, assignedIP)
 
 	jsonResponse(w, http.StatusOK, map[string]interface{}{
 		"assigned_ip":       assignedIP + "/24",
@@ -436,6 +438,7 @@ func (s *ServerState) handleGenerateGuestConfig(w http.ResponseWriter, r *http.R
 
 	// Apply to host WireGuard interface synchronously
 	s.applyWireGuardPeer(pubKey, assignedIP)
+	s.persistPeerToDB("Web-Guest-Client", pubKey, assignedIP)
 
 	// Build raw .conf profile text
 	rawConf := fmt.Sprintf(`[Interface]
@@ -651,6 +654,63 @@ func (s *ServerState) handleGetAnalyticsSummary(w http.ResponseWriter, r *http.R
 }
 
 // Helpers
+func (s *ServerState) rehydratePeersFromDB() {
+	if s.db == nil {
+		return
+	}
+	_, _ = s.db.Exec(`
+		CREATE TABLE IF NOT EXISTS peers (
+			id SERIAL PRIMARY KEY,
+			device_name VARCHAR(100) NOT NULL,
+			public_key VARCHAR(64) UNIQUE NOT NULL,
+			assigned_ip VARCHAR(45) UNIQUE NOT NULL,
+			is_active BOOLEAN DEFAULT TRUE,
+			last_handshake_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+		)`)
+
+	rows, err := s.db.Query(`SELECT public_key, assigned_ip FROM peers WHERE is_active = TRUE`)
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+
+	count := 0
+	for rows.Next() {
+		var pubKey, ip string
+		if err := rows.Scan(&pubKey, &ip); err == nil && pubKey != "" && ip != "" {
+			s.mu.Lock()
+			s.peerIPMap[pubKey] = ip
+			var lastOctet int
+			if _, err := fmt.Sscanf(ip, "10.8.0.%d", &lastOctet); err == nil && lastOctet >= s.nextIPIndex && lastOctet < 250 {
+				s.nextIPIndex = lastOctet + 1
+			}
+			s.mu.Unlock()
+			s.applyWireGuardPeer(pubKey, ip)
+			count++
+		}
+	}
+	log.Printf("Rehydrated %d active WireGuard peers from PostgreSQL into %s", count, s.cfg.WGInterface)
+}
+
+func (s *ServerState) persistPeerToDB(deviceName, pubKey, assignedIP string) {
+	if s.db == nil {
+		return
+	}
+	if deviceName == "" {
+		deviceName = "Zero-Login-Device"
+	}
+	go func() {
+		_, _ = s.db.Exec(`
+			INSERT INTO peers (device_name, public_key, assigned_ip, last_handshake_at)
+			VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+			ON CONFLICT (public_key) DO UPDATE
+			SET assigned_ip = EXCLUDED.assigned_ip, last_handshake_at = CURRENT_TIMESTAMP`,
+			deviceName, pubKey, assignedIP,
+		)
+	}()
+}
+
 func (s *ServerState) applyWireGuardPeer(pubKey, assignedIP string) {
 	// 1. Enter host network namespace (PID 1) so Docker container configures the host's wg0 interface
 	cmd := exec.Command("nsenter", "-t", "1", "-n", "wg", "set", s.cfg.WGInterface, "peer", pubKey, "allowed-ips", assignedIP+"/32")

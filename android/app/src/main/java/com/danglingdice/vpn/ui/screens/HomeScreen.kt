@@ -38,6 +38,10 @@ fun HomeScreen(
     statusDetail: String = "",
     stats: TunnelStats,
     selectedServer: ServerNode,
+    adBlockEnabled: Boolean = true,
+    accountToken: String = "DD-ZERO-AUTH",
+    onToggleAdBlock: (Boolean) -> Unit = {},
+    onPrivacyClick: () -> Unit = {},
     onToggleConnection: () -> Unit,
     onSelectServerClick: () -> Unit
 ) {
@@ -67,7 +71,10 @@ fun HomeScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.clickable { onPrivacyClick() }
+            ) {
                 Image(
                     painter = painterResource(id = R.drawable.ic_logo),
                     contentDescription = "Logo",
@@ -82,7 +89,7 @@ fun HomeScreen(
                         color = Color.White
                     )
                     Text(
-                        text = "Hardware | Key | Auth",
+                        text = "ID: $accountToken ⓘ",
                         fontSize = 11.sp,
                         color = Emerald500,
                         fontFamily = FontFamily.Monospace
@@ -253,6 +260,42 @@ fun HomeScreen(
                         Text(text = "Upload", fontSize = 11.sp, color = Slate400)
                         Text(text = formatBytes(stats.txBytes), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
                     }
+                }
+            }
+
+            // 1-Tap Ad & Malware DNS Sinkhole Toggle Card
+            Surface(
+                color = Slate900,
+                shape = RoundedCornerShape(16.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Slate800),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "🛡️ Ad & Malware DNS Shield",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                        Text(
+                            text = if (adBlockEnabled) "Active: Blocking trackers via 94.140.14.14" else "Standard DNS (1.1.1.1)",
+                            fontSize = 11.sp,
+                            color = if (adBlockEnabled) Emerald500 else Slate400
+                        )
+                    }
+                    Switch(
+                        checked = adBlockEnabled,
+                        onCheckedChange = onToggleAdBlock,
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.Black,
+                            checkedTrackColor = Emerald500
+                        )
+                    )
                 }
             }
 
