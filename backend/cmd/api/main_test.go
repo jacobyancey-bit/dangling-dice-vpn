@@ -126,3 +126,50 @@ func TestHandleCreateDevTunnel(t *testing.T) {
 	}
 }
 
+func TestZeroLoginIdempotentPeerRegistration(t *testing.T) {
+	state := newTestServerState()
+	_, pubKey := generateWireGuardKeyPair()
+
+	body, _ := json.Marshal(map[string]interface{}{
+		"device_name":     "Android-Pixel8",
+		"public_key":      pubKey,
+		"adblock_enabled": true,
+	})
+
+	// First connection
+	req1 := httptest.NewRequest(http.MethodPost, "/api/v1/peers/register", bytes.NewBuffer(body))
+	rr1 := httptest.NewRecorder()
+	state.handleRegisterPeer(rr1, req1)
+
+	if rr1.Code != http.StatusOK {
+		t.Fatalf("Expected status 200 on first registration, got %d: %s", rr1.Code, rr1.Body.String())
+	}
+	var resp1 map[string]interface{}
+	_ = json.Unmarshal(rr1.Body.Bytes(), &resp1)
+
+	// Reconnection from same device (same Curve25519 keypair)
+	req2 := httptest.NewRequest(http.MethodPost, "/api/v1/peers/register", bytes.NewBuffer(body))
+	rr2 := httptest.NewRecorder()
+	state.handleRegisterPeer(rr2, req2)
+
+	var resp2 map[string]interface{}
+	_ = json.Unmarshal(rr2.Body.Bytes(), &resp2)
+
+	if resp1["assigned_ip"] != resp2["assigned_ip"] {
+		t.Errorf("Expected idempotent IP assignment for same device key, got %v vs %v", resp1["assigned_ip"], resp2["assigned_ip"])
+	}
+	if resp1["account_token"] == "" || resp1["account_token"] != resp2["account_token"] {
+		t.Errorf("Expected deterministic Zero-Login account_token, got %v vs %v", resp1["account_token"], resp2["account_token"])
+	}
+
+	// Malformed key rejection test
+	badBody := []byte(`{"device_name":"Bot","public_key":"not-a-valid-32-byte-curve25519-key"}`)
+	reqBad := httptest.NewRequest(http.MethodPost, "/api/v1/peers/register", bytes.NewBuffer(badBody))
+	rrBad := httptest.NewRecorder()
+	state.handleRegisterPeer(rrBad, reqBad)
+	if rrBad.Code != http.StatusBadRequest {
+		t.Errorf("Expected 400 Bad Request for malformed Curve25519 key, got %d", rrBad.Code)
+	}
+}
+
+

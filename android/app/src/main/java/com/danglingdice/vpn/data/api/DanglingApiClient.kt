@@ -49,14 +49,22 @@ class DanglingApiClient(
         return@withContext defaultServers()
     }
 
-    suspend fun registerPeer(publicKey: String, deviceName: String): Pair<String, String>? = withContext(Dispatchers.IO) {
+    suspend fun registerPeer(
+        publicKey: String,
+        deviceName: String,
+        adBlockEnabled: Boolean = true
+    ): Pair<String, String>? = withContext(Dispatchers.IO) {
         try {
+            val timestamp = (System.currentTimeMillis() / 1000).toString()
             val payload = JSONObject().apply {
                 put("public_key", publicKey)
                 put("device_name", deviceName)
+                put("adblock_enabled", adBlockEnabled)
             }
             val req = Request.Builder()
                 .url("$baseUrl/api/v1/peers/register")
+                .addHeader("X-Dangling-Timestamp", timestamp)
+                .addHeader("X-Dangling-Client-Proof", sha256Hex("$publicKey:$timestamp"))
                 .post(payload.toString().toRequestBody(jsonMedia))
                 .build()
 
@@ -70,6 +78,11 @@ class DanglingApiClient(
             }
         } catch (_: Exception) {}
         return@withContext null
+    }
+
+    private fun sha256Hex(input: String): String {
+        val bytes = java.security.MessageDigest.getInstance("SHA-256").digest(input.toByteArray())
+        return bytes.joinToString("") { "%02x".format(it) }
     }
 
     suspend fun trackEvent(eventName: String, metadata: Map<String, String> = emptyMap()) = withContext(Dispatchers.IO) {

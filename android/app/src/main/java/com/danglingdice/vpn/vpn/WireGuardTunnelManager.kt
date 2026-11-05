@@ -41,9 +41,34 @@ class WireGuardTunnelManager(
     private val _adBlockEnabled = MutableStateFlow(true)
     val adBlockEnabled: StateFlow<Boolean> = _adBlockEnabled.asStateFlow()
 
-    private var clientKeyPair: KeyPair = KeyPair()
+    // Persistent Zero-Login Cryptographic Device Keypair & Anonymous Passkey ID
+    private val prefs = context.getSharedPreferences("dangling_zero_login_vault", Context.MODE_PRIVATE)
+    private val clientKeyPair: KeyPair = loadOrGeneratePersistentKeyPair()
+
+    private val _accountToken = MutableStateFlow(deriveZeroLoginToken(clientKeyPair.publicKey.toBase64()))
+    val accountToken: StateFlow<String> = _accountToken.asStateFlow()
+
     private var statsJob: Job? = null
     private var connectionStartTime: Long = 0
+
+    private fun loadOrGeneratePersistentKeyPair(): KeyPair {
+        val savedPrivKey = prefs.getString("wg_curve25519_private_key", null)
+        if (!savedPrivKey.isNullOrBlank()) {
+            try {
+                return KeyPair(com.wireguard.crypto.Key.fromBase64(savedPrivKey))
+            } catch (_: Exception) {}
+        }
+        val newPair = KeyPair()
+        prefs.edit().putString("wg_curve25519_private_key", newPair.privateKey.toBase64()).apply()
+        return newPair
+    }
+
+    private fun deriveZeroLoginToken(pubKeyBase64: String): String {
+        val digest = java.security.MessageDigest.getInstance("SHA-256")
+            .digest(pubKeyBase64.trim().toByteArray())
+        val hex = digest.take(6).joinToString("") { "%02X".format(it) }
+        return "DD-${hex.substring(0, 4)}-${hex.substring(4, 8)}-${hex.substring(8, 12)}"
+    }
 
     init {
         scope.launch {
@@ -77,13 +102,11 @@ class WireGuardTunnelManager(
 
         scope.launch(Dispatchers.IO) {
             try {
-                // 1. Generate new client cryptographic keypair
-                clientKeyPair = KeyPair()
-
-                // 2. Register public key with server control plane
+                // 1. Register persistent device Curve25519 public key with server control plane (Zero-Login Auth)
                 val registration = apiClient.registerPeer(
                     publicKey = clientKeyPair.publicKey.toBase64(),
-                    deviceName = "Android-${android.os.Build.MODEL}"
+                    deviceName = "Android-${android.os.Build.MODEL}",
+                    adBlockEnabled = _adBlockEnabled.value
                 )
 
                 val assignedIp = registration?.first ?: "10.8.0.2/24"

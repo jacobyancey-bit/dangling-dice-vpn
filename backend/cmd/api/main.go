@@ -2,8 +2,10 @@ package main
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -37,6 +39,8 @@ type ServerState struct {
 	cfg          Config
 	serverPubKey string
 	nextIPIndex  int
+	peerIPMap    map[string]string      // Persistent Curve25519 PublicKey -> Assigned 10.8.0.x IP
+	rateLimitMap map[string][]time.Time // Per-IP sliding window rate limiter for anti-bot protection
 }
 
 func main() {
@@ -57,8 +61,10 @@ func main() {
 	}
 
 	state := &ServerState{
-		cfg:         cfg,
-		nextIPIndex: 2, // Starts allocating from 10.8.0.2 upwards
+		cfg:          cfg,
+		nextIPIndex:  2, // Starts allocating from 10.8.0.2 upwards
+		peerIPMap:    make(map[string]string),
+		rateLimitMap: make(map[string][]time.Time),
 	}
 
 	// Read or load server public key from /etc/wireguard/server_public.key
@@ -284,7 +290,7 @@ type RegisterPeerRequest struct {
 	AdBlockEnabled bool   `json:"adblock_enabled"`
 }
 
-// Handler: Register peer with WireGuard
+// Handler: Register peer with WireGuard (Zero-Login Cryptographic Device Auth)
 func (s *ServerState) handleRegisterPeer(w http.ResponseWriter, r *http.Request) {
 	var req RegisterPeerRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.PublicKey == "" {
@@ -292,11 +298,35 @@ func (s *ServerState) handleRegisterPeer(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	if !isValidWireGuardKey(req.PublicKey) {
+		jsonError(w, http.StatusBadRequest, "Invalid Curve25519 'public_key' format (expected 32-byte base64 key).")
+		return
+	}
+
+	clientIP := r.Header.Get("X-Real-IP")
+	if clientIP == "" {
+		clientIP = r.RemoteAddr
+	}
+
 	s.mu.Lock()
-	assignedIP := fmt.Sprintf("10.8.0.%d", s.nextIPIndex)
-	s.nextIPIndex++
-	if s.nextIPIndex > 250 {
-		s.nextIPIndex = 2 // Wrap around (in production, use DB IPAM table)
+	if s.peerIPMap == nil {
+		s.peerIPMap = make(map[string]string)
+	}
+	// 1. Idempotent Zero-Login Lookup: Re-use existing IP if this device keypair is already registered
+	assignedIP, exists := s.peerIPMap[req.PublicKey]
+	if !exists {
+		// 2. Enforce anti-bot rate limit only when allocating a brand-new peer key
+		if !s.allowRateLimitLocked(clientIP, 15, 10*time.Minute) {
+			s.mu.Unlock()
+			jsonError(w, http.StatusTooManyRequests, "Rate limit exceeded for new peer registrations. Please wait a few minutes.")
+			return
+		}
+		assignedIP = fmt.Sprintf("10.8.0.%d", s.nextIPIndex)
+		s.nextIPIndex++
+		if s.nextIPIndex > 250 {
+			s.nextIPIndex = 2 // Wrap around & recycle oldest slot
+		}
+		s.peerIPMap[req.PublicKey] = assignedIP
 	}
 	s.mu.Unlock()
 
@@ -305,6 +335,9 @@ func (s *ServerState) handleRegisterPeer(w http.ResponseWriter, r *http.Request)
 		// AdGuard DNS Sinkhole (Blocks Ads, Trackers, and Malware at DNS level)
 		dnsServer = "94.140.14.14, 94.140.15.15"
 	}
+
+	// Derive deterministic Zero-Login Account Token from device's Curve25519 PublicKey
+	accountToken := deriveAccountToken(req.PublicKey)
 
 	// Apply dynamically to WireGuard interface via 'wg set'
 	// Format: wg set wg0 peer <PubKey> allowed-ips <IP>/32
@@ -324,6 +357,8 @@ func (s *ServerState) handleRegisterPeer(w http.ResponseWriter, r *http.Request)
 		"dns":               dnsServer,
 		"adblock_active":    req.AdBlockEnabled,
 		"allowed_ips":       "0.0.0.0/0, ::/0",
+		"account_token":     accountToken,
+		"auth_mode":         "zero_login_curve25519",
 	})
 }
 
@@ -569,6 +604,38 @@ func (s *ServerState) handleGetAnalyticsSummary(w http.ResponseWriter, r *http.R
 }
 
 // Helpers
+func isValidWireGuardKey(pubKey string) bool {
+	decoded, err := base64.StdEncoding.DecodeString(strings.TrimSpace(pubKey))
+	return err == nil && len(decoded) == 32
+}
+
+func deriveAccountToken(pubKey string) string {
+	sum := sha256.Sum256([]byte(strings.TrimSpace(pubKey)))
+	hexStr := strings.ToUpper(hex.EncodeToString(sum[:6])) // 12 hex chars
+	return fmt.Sprintf("DD-%s-%s-%s", hexStr[0:4], hexStr[4:8], hexStr[8:12])
+}
+
+func (s *ServerState) allowRateLimitLocked(clientIP string, maxRequests int, window time.Duration) bool {
+	if s.rateLimitMap == nil {
+		s.rateLimitMap = make(map[string][]time.Time)
+	}
+	now := time.Now()
+	cutoff := now.Add(-window)
+	history := s.rateLimitMap[clientIP]
+	valid := history[:0]
+	for _, ts := range history {
+		if ts.After(cutoff) {
+			valid = append(valid, ts)
+		}
+	}
+	if len(valid) >= maxRequests {
+		s.rateLimitMap[clientIP] = valid
+		return false
+	}
+	s.rateLimitMap[clientIP] = append(valid, now)
+	return true
+}
+
 func generateWireGuardKeyPair() (string, string) {
 	var priv [32]byte
 	rand.Read(priv[:])

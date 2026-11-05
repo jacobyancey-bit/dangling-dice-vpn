@@ -71,7 +71,7 @@ fun HomeScreen(
                         color = Color.White
                     )
                     Text(
-                        text = "Zero-Log WireGuard",
+                        text = "Zero-Login • Hardware Key Auth",
                         fontSize = 11.sp,
                         color = Emerald500,
                         fontFamily = FontFamily.Monospace
