@@ -38,6 +38,9 @@ class WireGuardTunnelManager(
     private val _excludedApps = MutableStateFlow<Set<String>>(emptySet())
     val excludedApps: StateFlow<Set<String>> = _excludedApps.asStateFlow()
 
+    private val _adBlockEnabled = MutableStateFlow(true)
+    val adBlockEnabled: StateFlow<Boolean> = _adBlockEnabled.asStateFlow()
+
     private var clientKeyPair: KeyPair = KeyPair()
     private var statsJob: Job? = null
     private var connectionStartTime: Long = 0
@@ -64,6 +67,10 @@ class WireGuardTunnelManager(
         _excludedApps.value = apps
     }
 
+    fun setAdBlockEnabled(enabled: Boolean) {
+        _adBlockEnabled.value = enabled
+    }
+
     fun connect(server: ServerNode) {
         if (_status.value != ConnectionStatus.DISCONNECTED) return
         _status.value = ConnectionStatus.CONNECTING
@@ -81,12 +88,13 @@ class WireGuardTunnelManager(
 
                 val assignedIp = registration?.first ?: "10.8.0.2/24"
                 val serverPubKey = registration?.second ?: server.publicKey
+                val dnsTarget = if (_adBlockEnabled.value) "94.140.14.14" else "1.1.1.1"
 
-                // 3. Build WireGuard Configuration with Split-Tunneling support
+                // 3. Build WireGuard Configuration with Split-Tunneling & Ad-Block DNS support
                 val ifaceBuilder = Interface.Builder()
                     .parsePrivateKey(clientKeyPair.privateKey.toBase64())
                     .addAddress(com.wireguard.config.InetNetwork.parse(assignedIp))
-                    .addDnsServer(InetAddress.getByName("1.1.1.1"))
+                    .addDnsServer(InetAddress.getByName(dnsTarget))
 
                 // Apply Split Tunneling exclusions
                 if (_excludedApps.value.isNotEmpty()) {
