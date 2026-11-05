@@ -56,3 +56,4 @@ CREATE INDEX IF NOT EXISTS idx_telemetry_event_name ON telemetry_events(event_na
 CREATE INDEX IF NOT EXISTS idx_telemetry_created_at ON telemetry_events(created_at);
 CREATE INDEX IF NOT EXISTS idx_telemetry_utm_source ON telemetry_events(utm_source);
 CREATE INDEX IF NOT EXISTS idx_telemetry_platform ON telemetry_events(platform);
+

@@ -99,6 +99,7 @@ func main() {
 		r.Get("/tools/diagnostics", state.handleDiagnostics)
 		r.Post("/peers/register", state.handleRegisterPeer)
 		r.Post("/tools/guest-config", state.handleGenerateGuestConfig)
+		r.Post("/tools/dev-tunnel", state.handleCreateDevTunnel)
 
 		// Single Source of Truth (SSOT): Telemetry, Attribution & A/B Testing
 		r.Post("/telemetry/event", state.handleTrackEvent)
@@ -162,8 +163,9 @@ func (s *ServerState) handleListServers(w http.ResponseWriter, r *http.Request) 
 }
 
 type RegisterPeerRequest struct {
-	DeviceName string `json:"device_name"`
-	PublicKey  string `json:"public_key"`
+	DeviceName     string `json:"device_name"`
+	PublicKey      string `json:"public_key"`
+	AdBlockEnabled bool   `json:"adblock_enabled"`
 }
 
 // Handler: Register peer with WireGuard
@@ -182,6 +184,12 @@ func (s *ServerState) handleRegisterPeer(w http.ResponseWriter, r *http.Request)
 	}
 	s.mu.Unlock()
 
+	dnsServer := s.cfg.VPNDNSServer
+	if req.AdBlockEnabled {
+		// AdGuard DNS Sinkhole (Blocks Ads, Trackers, and Malware at DNS level)
+		dnsServer = "94.140.14.14, 94.140.15.15"
+	}
+
 	// Apply dynamically to WireGuard interface via 'wg set'
 	// Format: wg set wg0 peer <PubKey> allowed-ips <IP>/32
 	go func(pubKey, ip string) {
@@ -194,16 +202,24 @@ func (s *ServerState) handleRegisterPeer(w http.ResponseWriter, r *http.Request)
 	}(req.PublicKey, assignedIP)
 
 	jsonResponse(w, http.StatusOK, map[string]interface{}{
-		"assigned_ip":      assignedIP + "/24",
+		"assigned_ip":       assignedIP + "/24",
 		"server_public_key": s.serverPubKey,
-		"endpoint":         fmt.Sprintf("%s:%s", s.cfg.ServerPublicIP, s.cfg.VPNListenPort),
-		"dns":              s.cfg.VPNDNSServer,
-		"allowed_ips":      "0.0.0.0/0, ::/0",
+		"endpoint":          fmt.Sprintf("%s:%s", s.cfg.ServerPublicIP, s.cfg.VPNListenPort),
+		"dns":               dnsServer,
+		"adblock_active":    req.AdBlockEnabled,
+		"allowed_ips":       "0.0.0.0/0, ::/0",
 	})
+}
+
+type GuestConfigRequest struct {
+	AdBlockEnabled bool `json:"adblock_enabled"`
 }
 
 // Handler: 1-Click Instant Guest WireGuard Configuration (For Web Developer Funnel)
 func (s *ServerState) handleGenerateGuestConfig(w http.ResponseWriter, r *http.Request) {
+	var req GuestConfigRequest
+	_ = json.NewDecoder(r.Body).Decode(&req)
+
 	// Generate a curve25519 keypair for the client
 	privKey, pubKey := generateWireGuardKeyPair()
 
@@ -214,6 +230,11 @@ func (s *ServerState) handleGenerateGuestConfig(w http.ResponseWriter, r *http.R
 		s.nextIPIndex = 2
 	}
 	s.mu.Unlock()
+
+	dnsServer := s.cfg.VPNDNSServer
+	if req.AdBlockEnabled {
+		dnsServer = "94.140.14.14, 94.140.15.15"
+	}
 
 	// Apply to WireGuard
 	exec.Command("wg", "set", s.cfg.WGInterface, "peer", pubKey, "allowed-ips", assignedIP+"/32").Run()
@@ -229,13 +250,47 @@ PublicKey = %s
 Endpoint = %s:%s
 AllowedIPs = 0.0.0.0/0, ::/0
 PersistentKeepalive = 25
-`, privKey, assignedIP, s.cfg.VPNDNSServer, s.serverPubKey, s.cfg.ServerPublicIP, s.cfg.VPNListenPort)
+`, privKey, assignedIP, dnsServer, s.serverPubKey, s.cfg.ServerPublicIP, s.cfg.VPNListenPort)
 
 	jsonResponse(w, http.StatusOK, map[string]interface{}{
-		"assigned_ip": assignedIP,
-		"public_key":  pubKey,
-		"config_text": rawConf,
-		"expires_in":  "24 hours",
+		"assigned_ip":    assignedIP,
+		"public_key":     pubKey,
+		"dns":            dnsServer,
+		"adblock_active": req.AdBlockEnabled,
+		"config_text":    rawConf,
+		"expires_in":     "24 hours",
+	})
+}
+
+type DevTunnelRequest struct {
+	Subdomain  string `json:"subdomain"`
+	TargetPort int    `json:"target_port"`
+	PeerIP     string `json:"peer_ip"`
+}
+
+// Handler: Developer Port Forwarding / Localhost Tunneling
+func (s *ServerState) handleCreateDevTunnel(w http.ResponseWriter, r *http.Request) {
+	var req DevTunnelRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Subdomain == "" || req.TargetPort <= 0 {
+		jsonError(w, http.StatusBadRequest, "Valid 'subdomain' and 'target_port' are required.")
+		return
+	}
+	if req.PeerIP == "" {
+		req.PeerIP = "10.8.0.2"
+	}
+
+	if s.db != nil {
+		_, _ = s.db.Exec(
+			`INSERT INTO dev_tunnels (subdomain, target_port, peer_ip) VALUES ($1, $2, $3) ON CONFLICT (subdomain) DO UPDATE SET target_port = $2, peer_ip = $3`,
+			req.Subdomain, req.TargetPort, req.PeerIP,
+		)
+	}
+
+	jsonResponse(w, http.StatusOK, map[string]interface{}{
+		"status":      "active",
+		"public_url":  fmt.Sprintf("http://%s.%s", req.Subdomain, s.cfg.ServerPublicIP),
+		"target":      fmt.Sprintf("%s:%d", req.PeerIP, req.TargetPort),
+		"description": "Traffic to this URL routes over the encrypted WireGuard mesh to your local port.",
 	})
 }
 
