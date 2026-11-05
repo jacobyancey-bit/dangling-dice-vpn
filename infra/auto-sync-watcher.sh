@@ -18,6 +18,7 @@ if [ "$LOCAL_SHA" != "$REMOTE_SHA" ]; then
 
     # Only rebuild Docker containers if server/web files changed (ignore Android-only commits)
     if echo "$CHANGED_FILES" | grep -qE "^(backend/|web/|studio/|Caddyfile|docker-compose\.yml)"; then
+        docker compose restart caddy || true
         docker exec -i dangling-postgres psql -U dangling_user -d dangling_dice_db < backend/migrations/002_telemetry.sql || true
         docker compose up -d --build api web studio
         docker compose restart caddy

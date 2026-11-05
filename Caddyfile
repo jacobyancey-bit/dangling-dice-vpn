@@ -1,5 +1,5 @@
 {
-    # Global options
+    # Global options — Auto-HTTPS via Let's Encrypt & ZeroSSL
     admin off
 }
 
