@@ -40,11 +40,14 @@ class DanglingApiClient(
                             list.add(
                                 ServerNode(
                                     id = obj.optString("id", "us-east-1"),
-                                    name = obj.optString("name", "US East Gateway"),
+                                    name = obj.optString("name", "United States • East"),
+                                    city = obj.optString("city", "Atlanta / New York"),
                                     endpoint = obj.optString("endpoint", "165.245.142.71:51820"),
                                     publicKey = obj.optString("public_key", ""),
                                     isFreeTier = obj.optBoolean("is_free_tier", true),
-                                    pingMs = 18
+                                    pingMs = obj.optInt("ping_ms", 18),
+                                    flagEmoji = obj.optString("flag_emoji", "🇺🇸"),
+                                    loadPercent = obj.optInt("load_percent", 14)
                                 )
                             )
                         }
@@ -138,14 +141,5 @@ class DanglingApiClient(
         return@withContext LeakReport(clientIp = "Direct Link", isVpnSecured = false)
     }
 
-    private fun defaultServers() = listOf(
-        ServerNode(
-            id = "us-east-1",
-            name = "US East Gateway (Primary)",
-            endpoint = "165.245.142.71:51820",
-            publicKey = "",
-            isFreeTier = true,
-            pingMs = 18
-        )
-    )
+    private fun defaultServers() = com.danglingdice.vpn.data.model.defaultServerLocations()
 }

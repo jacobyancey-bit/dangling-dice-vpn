@@ -69,22 +69,15 @@ fun MainAppScaffold(
     onConnectRequested: (ServerNode) -> Unit
 ) {
     var selectedTab by remember { mutableStateOf(0) }
+    var showLocationPicker by remember { mutableStateOf(false) }
     val status by tunnelManager.status.collectAsState()
     val statusDetail by tunnelManager.statusDetail.collectAsState()
     val stats by tunnelManager.stats.collectAsState()
     val excludedApps by tunnelManager.excludedApps.collectAsState()
+    val availableServers by tunnelManager.servers.collectAsState()
 
     var selectedServer by remember {
-        mutableStateOf(
-            ServerNode(
-                id = "us-east-1",
-                name = "US East Gateway (Primary)",
-                endpoint = "165.245.142.71:51820",
-                publicKey = "xTpevhK8n+3m9+yH8OaJ6uV0cQw4Mv+B9x7pY6s=",
-                isFreeTier = true,
-                pingMs = 18
-            )
-        )
+        mutableStateOf(com.danglingdice.vpn.data.model.defaultServerLocations().first())
     }
 
     Scaffold(
@@ -165,7 +158,7 @@ fun MainAppScaffold(
                             onConnectRequested(selectedServer)
                         }
                     },
-                    onSelectServerClick = { /* Can show server selection bottom sheet */ }
+                    onSelectServerClick = { showLocationPicker = true }
                 )
                 1 -> SplitTunnelScreen(
                     excludedApps = excludedApps,
@@ -184,6 +177,90 @@ fun MainAppScaffold(
                 )
                 3 -> DiagnosticsScreen(
                     onBackClick = { selectedTab = 0 }
+                )
+            }
+
+            if (showLocationPicker) {
+                AlertDialog(
+                    onDismissRequest = { showLocationPicker = false },
+                    containerColor = Slate900,
+                    titleContentColor = Color.White,
+                    title = {
+                        androidx.compose.foundation.layout.Column {
+                            Text(
+                                text = "🌍 Select VPN Location",
+                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                                color = Color.White
+                            )
+                            Text(
+                                text = "Choose your encrypted WireGuard gateway region",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Slate400
+                            )
+                        }
+                    },
+                    text = {
+                        androidx.compose.foundation.layout.Column(
+                            verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)
+                        ) {
+                            availableServers.forEach { node ->
+                                val isSelected = node.id == selectedServer.id
+                                Surface(
+                                    onClick = {
+                                        selectedServer = node
+                                        showLocationPicker = false
+                                        tunnelManager.selectServerLocation(node)
+                                    },
+                                    color = if (isSelected) Emerald500.copy(alpha = 0.14f) else Slate950,
+                                    shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+                                    border = androidx.compose.foundation.BorderStroke(
+                                        1.dp,
+                                        if (isSelected) Emerald500 else Slate800
+                                    ),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    androidx.compose.foundation.layout.Row(
+                                        modifier = Modifier.padding(12.dp),
+                                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                                        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween
+                                    ) {
+                                        androidx.compose.foundation.layout.Row(
+                                            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                                        ) {
+                                            Text(text = node.flagEmoji, style = MaterialTheme.typography.headlineSmall)
+                                            androidx.compose.foundation.layout.Spacer(
+                                                modifier = Modifier.padding(horizontal = 5.dp)
+                                            )
+                                            androidx.compose.foundation.layout.Column {
+                                                Text(
+                                                    text = node.name,
+                                                    color = if (isSelected) Emerald500 else Color.White,
+                                                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                                                    style = MaterialTheme.typography.bodyMedium
+                                                )
+                                                Text(
+                                                    text = "${node.city} • ${node.loadPercent}% Load",
+                                                    color = Slate400,
+                                                    style = MaterialTheme.typography.bodySmall
+                                                )
+                                            }
+                                        }
+                                        Text(
+                                            text = "${node.pingMs}ms",
+                                            color = Emerald500,
+                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                            style = MaterialTheme.typography.labelMedium
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(onClick = { showLocationPicker = false }) {
+                            Text("Close", color = Emerald500)
+                        }
+                    }
                 )
             }
         }

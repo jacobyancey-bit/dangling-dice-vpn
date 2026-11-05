@@ -256,12 +256,12 @@ fun HomeScreen(
                 }
             }
 
-            // Server Node Selection Card
+            // Server Node Selection Card (Tap to Open Global Location Picker)
             Surface(
                 onClick = onSelectServerClick,
                 color = Slate900,
                 shape = RoundedCornerShape(16.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Slate800),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Emerald500.copy(alpha = 0.35f)),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
@@ -270,16 +270,30 @@ fun HomeScreen(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(text = "🇺🇸", fontSize = 24.sp)
+                        Text(text = selectedServer.flagEmoji, fontSize = 26.sp)
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {
-                            Text(text = selectedServer.name, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                            Text(text = selectedServer.endpoint, fontSize = 12.sp, color = Slate400, fontFamily = FontFamily.Monospace)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(text = selectedServer.name, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "CHANGE ▾",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Emerald500,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                            }
+                            Text(
+                                text = "${selectedServer.city} • ${selectedServer.loadPercent}% Load",
+                                fontSize = 12.sp,
+                                color = Slate400
+                            )
                         }
                     }
 
                     Surface(
-                        color = Emerald500.copy(alpha = 0.1f),
+                        color = Emerald500.copy(alpha = 0.12f),
                         shape = RoundedCornerShape(8.dp)
                     ) {
                         Text(

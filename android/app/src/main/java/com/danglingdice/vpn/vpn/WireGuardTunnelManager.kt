@@ -44,6 +44,9 @@ class WireGuardTunnelManager(
     private val _adBlockEnabled = MutableStateFlow(true)
     val adBlockEnabled: StateFlow<Boolean> = _adBlockEnabled.asStateFlow()
 
+    private val _servers = MutableStateFlow(com.danglingdice.vpn.data.model.defaultServerLocations())
+    val servers: StateFlow<List<ServerNode>> = _servers.asStateFlow()
+
     // Persistent Zero-Login Cryptographic Device Keypair & Anonymous Passkey ID
     private val prefs = context.getSharedPreferences("dangling_zero_login_vault", Context.MODE_PRIVATE)
     private val clientKeyPair: KeyPair = loadOrGeneratePersistentKeyPair()
@@ -74,6 +77,15 @@ class WireGuardTunnelManager(
     }
 
     init {
+        scope.launch {
+            try {
+                val remoteServers = apiClient.fetchServers()
+                if (remoteServers.isNotEmpty()) {
+                    _servers.value = remoteServers
+                }
+            } catch (_: Exception) {}
+        }
+
         scope.launch {
             tunnel.state.collect { wireguardState ->
                 when (wireguardState) {
@@ -106,6 +118,22 @@ class WireGuardTunnelManager(
 
     fun setAdBlockEnabled(enabled: Boolean) {
         _adBlockEnabled.value = enabled
+    }
+
+    fun selectServerLocation(server: ServerNode) {
+        scope.launch(Dispatchers.IO) {
+            apiClient.trackEvent("location_selected", mapOf("region_id" to server.id, "region_name" to server.name))
+            if (_status.value == ConnectionStatus.CONNECTED) {
+                _statusDetail.value = "Switching tunnel location to ${server.name} (${server.city})..."
+                try {
+                    DanglingApplication.instance.wireGuardBackend.setState(tunnel, Tunnel.State.DOWN, null)
+                } catch (_: Exception) {}
+                delay(400)
+                connect(server)
+            } else {
+                _statusDetail.value = "Selected ${server.flagEmoji} ${server.name} (${server.city}) — Tap power dial to connect"
+            }
+        }
     }
 
     fun reportPermissionDenied() {
