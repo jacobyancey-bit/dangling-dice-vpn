@@ -10,6 +10,7 @@ export default function Home() {
   const [guestConfig, setGuestConfig] = useState<string | null>(null);
   const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [adBlockEnabled, setAdBlockEnabled] = useState(true);
   const [activeTab, setActiveTab] = useState<'tools' | 'vpn' | 'nodes'>('vpn');
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
@@ -41,6 +42,8 @@ export default function Home() {
     try {
       const res = await fetch(`${apiUrl}/api/v1/tools/guest-config`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adblock_enabled: adBlockEnabled }),
       });
       const data = await res.json();
       setGuestConfig(data.config_text);
@@ -103,6 +106,11 @@ export default function Home() {
                 className={activeTab === 'nodes' ? 'text-emerald-400' : 'hover:text-white transition'}>
                 Edge Nodes
               </button>
+              <a 
+                href="/admin" 
+                className="text-emerald-400/90 hover:text-emerald-300 font-mono text-xs border border-emerald-500/30 px-2.5 py-1 rounded-md bg-emerald-500/5 transition">
+                📊 SSOT Analytics
+              </a>
             </nav>
             <a 
               href="#download-android" 
@@ -159,7 +167,20 @@ export default function Home() {
               </p>
             </div>
 
-            <div className="mt-8 pt-8 border-t border-slate-800/80">
+            <div className="mt-8 pt-6 border-t border-slate-800/80 space-y-4">
+              <div className="flex items-center justify-between p-3.5 rounded-xl bg-slate-900/80 border border-slate-800">
+                <div>
+                  <span className="text-sm font-semibold text-white">Enable Ad & Malware DNS Sinkhole</span>
+                  <p className="text-xs text-slate-400">Blocks 50,000+ ad networks, trackers & telemetry domains at the DNS layer</p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={adBlockEnabled}
+                  onChange={(e) => setAdBlockEnabled(e.target.checked)}
+                  className="w-5 h-5 accent-emerald-500 rounded cursor-pointer"
+                />
+              </div>
+
               {!guestConfig ? (
                 <button
                   onClick={generateGuestProfile}
