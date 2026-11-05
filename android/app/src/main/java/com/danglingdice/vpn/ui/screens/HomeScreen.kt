@@ -101,57 +101,78 @@ fun HomeScreen(
                 }
             }
 
-            Surface(
-                color = when (status) {
-                    ConnectionStatus.CONNECTED -> Emerald500.copy(alpha = 0.15f)
-                    ConnectionStatus.ERROR -> Red500.copy(alpha = 0.15f)
-                    ConnectionStatus.CONNECTING, ConnectionStatus.VERIFYING_HANDSHAKE -> Amber500.copy(alpha = 0.15f)
-                    else -> Slate800
-                },
-                shape = RoundedCornerShape(12.dp),
-                border = androidx.compose.foundation.BorderStroke(
-                    1.dp,
-                    when (status) {
-                        ConnectionStatus.CONNECTED -> Emerald500.copy(alpha = 0.4f)
-                        ConnectionStatus.ERROR -> Red500.copy(alpha = 0.4f)
-                        ConnectionStatus.CONNECTING, ConnectionStatus.VERIFYING_HANDSHAKE -> Amber500.copy(alpha = 0.4f)
-                        else -> Color.Transparent
-                    }
-                )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Shield,
-                        contentDescription = null,
-                        tint = when (status) {
-                            ConnectionStatus.CONNECTED -> Emerald500
-                            ConnectionStatus.ERROR -> Red500
-                            ConnectionStatus.CONNECTING, ConnectionStatus.VERIFYING_HANDSHAKE -> Amber500
-                            else -> Slate400
-                        },
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = when (status) {
-                            ConnectionStatus.CONNECTED -> "VERIFIED SECURE"
-                            ConnectionStatus.VERIFYING_HANDSHAKE -> "HANDSHAKING..."
-                            ConnectionStatus.CONNECTING -> "CONNECTING..."
-                            ConnectionStatus.ERROR -> "CONNECTION ISSUE"
-                            else -> "UNPROTECTED"
-                        },
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = when (status) {
-                            ConnectionStatus.CONNECTED -> Emerald500
-                            ConnectionStatus.ERROR -> Red500
-                            ConnectionStatus.CONNECTING, ConnectionStatus.VERIFYING_HANDSHAKE -> Amber500
-                            else -> Slate400
+                Surface(
+                    color = when (status) {
+                        ConnectionStatus.CONNECTED -> Emerald500.copy(alpha = 0.15f)
+                        ConnectionStatus.ERROR -> Red500.copy(alpha = 0.15f)
+                        ConnectionStatus.CONNECTING, ConnectionStatus.VERIFYING_HANDSHAKE -> Amber500.copy(alpha = 0.15f)
+                        else -> Slate800
+                    },
+                    shape = RoundedCornerShape(12.dp),
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        when (status) {
+                            ConnectionStatus.CONNECTED -> Emerald500.copy(alpha = 0.4f)
+                            ConnectionStatus.ERROR -> Red500.copy(alpha = 0.4f)
+                            ConnectionStatus.CONNECTING, ConnectionStatus.VERIFYING_HANDSHAKE -> Amber500.copy(alpha = 0.4f)
+                            else -> Color.Transparent
                         }
                     )
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Shield,
+                            contentDescription = null,
+                            tint = when (status) {
+                                ConnectionStatus.CONNECTED -> Emerald500
+                                ConnectionStatus.ERROR -> Red500
+                                ConnectionStatus.CONNECTING, ConnectionStatus.VERIFYING_HANDSHAKE -> Amber500
+                                else -> Slate400
+                            },
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = when (status) {
+                                ConnectionStatus.CONNECTED -> "VERIFIED SECURE"
+                                ConnectionStatus.VERIFYING_HANDSHAKE -> "HANDSHAKING..."
+                                ConnectionStatus.CONNECTING -> "CONNECTING..."
+                                ConnectionStatus.ERROR -> "CONNECTION ISSUE"
+                                else -> "UNPROTECTED"
+                            },
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = when (status) {
+                                ConnectionStatus.CONNECTED -> Emerald500
+                                ConnectionStatus.ERROR -> Red500
+                                ConnectionStatus.CONNECTING, ConnectionStatus.VERIFYING_HANDSHAKE -> Amber500
+                                else -> Slate400
+                            }
+                        )
+                    }
+                }
+
+                if (!isPremiumUser) {
+                    Surface(
+                        onClick = onUpgradePremiumClick,
+                        color = Amber500,
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text(
+                            text = "Remove Ads 👑",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.Black,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
+                        )
+                    }
                 }
             }
         }
@@ -174,53 +195,33 @@ fun HomeScreen(
                             .fillMaxWidth()
                             .clickable { onAdBannerClick() }
                             .padding(horizontal = 12.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Surface(
-                                color = Amber500.copy(alpha = 0.2f),
-                                shape = RoundedCornerShape(6.dp)
-                            ) {
-                                Text(
-                                    text = "AD",
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Amber500,
-                                    fontFamily = FontFamily.Monospace,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Column {
-                                Text(
-                                    text = "☁️ DigitalOcean Cloud • $200 Free Credit",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
-                                )
-                                Text(
-                                    text = "Deploy high-speed VPS droplets in 60s ↗",
-                                    fontSize = 10.sp,
-                                    color = Slate400
-                                )
-                            }
-                        }
-
                         Surface(
-                            onClick = onUpgradePremiumClick,
-                            color = Amber500,
-                            shape = RoundedCornerShape(8.dp)
+                            color = Amber500.copy(alpha = 0.2f),
+                            shape = RoundedCornerShape(6.dp)
                         ) {
                             Text(
-                                text = "Remove Ads 👑",
-                                fontSize = 10.sp,
+                                text = "AD",
+                                fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color.Black,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
+                                color = Amber500,
+                                fontFamily = FontFamily.Monospace,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = "☁️ DigitalOcean Cloud • $200 Free Credit",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                            Text(
+                                text = "Deploy high-speed VPS droplets in 60s ↗",
+                                fontSize = 10.sp,
+                                color = Slate400
                             )
                         }
                     }
