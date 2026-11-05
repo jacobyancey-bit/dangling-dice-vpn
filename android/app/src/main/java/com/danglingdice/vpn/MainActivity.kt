@@ -1,6 +1,5 @@
 package com.danglingdice.vpn
 
-import android.app.Activity
 import android.net.VpnService
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -9,20 +8,43 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AltRoute
+import androidx.compose.material.icons.automirrored.filled.AltRoute
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Speed
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.danglingdice.vpn.data.model.ConnectionStatus
 import com.danglingdice.vpn.data.model.DnsProfile
 import com.danglingdice.vpn.data.model.ServerNode
-import com.danglingdice.vpn.ui.screens.*
-import com.danglingdice.vpn.ui.theme.*
+import com.danglingdice.vpn.ui.screens.DiagnosticsScreen
+import com.danglingdice.vpn.ui.screens.HomeScreen
+import com.danglingdice.vpn.ui.screens.KillSwitchScreen
+import com.danglingdice.vpn.ui.screens.SplitTunnelScreen
+import com.danglingdice.vpn.ui.theme.DanglingDiceTheme
+import com.danglingdice.vpn.ui.theme.Emerald500
+import com.danglingdice.vpn.ui.theme.Slate400
+import com.danglingdice.vpn.ui.theme.Slate800
+import com.danglingdice.vpn.ui.theme.Slate900
+import com.danglingdice.vpn.ui.theme.Slate950
 import com.danglingdice.vpn.vpn.WireGuardTunnelManager
 
 class MainActivity : ComponentActivity() {
@@ -35,7 +57,7 @@ class MainActivity : ComponentActivity() {
     private val vpnPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
+        if (result.resultCode == RESULT_OK) {
             pendingServerToConnect?.let { server ->
                 tunnelManager.connect(server)
             }
@@ -71,10 +93,11 @@ fun MainAppScaffold(
     tunnelManager: WireGuardTunnelManager,
     onConnectRequested: (ServerNode) -> Unit
 ) {
-    var selectedTab by remember { mutableStateOf(0) }
+    var selectedTab by remember { mutableIntStateOf(0) }
     var showLocationPicker by remember { mutableStateOf(false) }
     var showDnsPicker by remember { mutableStateOf(false) }
     var showPrivacyDialog by remember { mutableStateOf(false) }
+    var showPremiumDialog by remember { mutableStateOf(false) }
 
     val status by tunnelManager.status.collectAsState()
     val statusDetail by tunnelManager.statusDetail.collectAsState()
@@ -85,6 +108,7 @@ fun MainAppScaffold(
     val dnsProfile by tunnelManager.dnsProfile.collectAsState()
     val stealthModeEnabled by tunnelManager.stealthModeEnabled.collectAsState()
     val autoConnectWifiShield by tunnelManager.autoConnectWifiShield.collectAsState()
+    val isPremiumUser by tunnelManager.isPremiumUser.collectAsState()
     val accountToken by tunnelManager.accountToken.collectAsState()
     val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
 
@@ -110,7 +134,7 @@ fun MainAppScaffold(
                 NavigationBarItem(
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1 },
-                    icon = { Icon(Icons.Default.AltRoute, contentDescription = "Split") },
+                    icon = { Icon(Icons.AutoMirrored.Filled.AltRoute, contentDescription = "Split") },
                     label = { Text("Split Tunnel") },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = Emerald500,
@@ -161,8 +185,11 @@ fun MainAppScaffold(
                     selectedServer = selectedServer,
                     dnsProfile = dnsProfile,
                     stealthModeEnabled = stealthModeEnabled,
+                    isPremiumUser = isPremiumUser,
                     accountToken = accountToken,
                     onSelectDnsProfileClick = { showDnsPicker = true },
+                    onUpgradePremiumClick = { showPremiumDialog = true },
+                    onAdBannerClick = { uriHandler.openUri("https://www.digitalocean.com") },
                     onPrivacyClick = { showPrivacyDialog = true },
                     onToggleConnection = {
                         if (status == ConnectionStatus.CONNECTED ||
@@ -383,6 +410,24 @@ fun MainAppScaffold(
                                 color = Color.White,
                                 style = MaterialTheme.typography.bodySmall
                             )
+                            Surface(
+                                onClick = {
+                                    showPrivacyDialog = false
+                                    showPremiumDialog = true
+                                },
+                                color = Amber500.copy(alpha = 0.15f),
+                                shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, Amber500.copy(alpha = 0.5f)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = if (isPremiumUser) "👑 Status: Premium Pro Active (Tap to Manage)" else "👑 Status: Free Tier (Tap to Upgrade to Pro)",
+                                    color = Amber500,
+                                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier.padding(10.dp)
+                                )
+                            }
                         }
                     },
                     dismissButton = {
@@ -398,6 +443,77 @@ fun MainAppScaffold(
                     confirmButton = {
                         TextButton(onClick = { showPrivacyDialog = false }) {
                             Text("Done", color = Color.White)
+                        }
+                    }
+                )
+            }
+
+            // 4. Premium Account Access & Ad-Removal Upgrade Modal
+            if (showPremiumDialog) {
+                AlertDialog(
+                    onDismissRequest = { showPremiumDialog = false },
+                    containerColor = Slate900,
+                    titleContentColor = Color.White,
+                    title = {
+                        androidx.compose.foundation.layout.Column {
+                            Text(
+                                text = "👑 Dangling Dice VPN Pro",
+                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                                color = Amber500
+                            )
+                            Text(
+                                text = "Zero-Login Hardware Passkey: $accountToken",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                color = Emerald500
+                            )
+                        }
+                    },
+                    text = {
+                        androidx.compose.foundation.layout.Column(
+                            verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(10.dp)
+                        ) {
+                            Text(
+                                text = "Upgrade your hardware key to Premium Pro Access — no email or password required:",
+                                color = Slate400,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            Text(
+                                text = "✅ Remove All Banner Ads (100% Clean Home Screen)\n✅ Priority 2 Gbps WireGuard Port Bandwidth\n✅ Unlock All 5 Global Relay Locations\n✅ 4-Mode Threat & Gaming DNS + Stealth Anti-DPI",
+                                color = Color.White,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    },
+                    dismissButton = {
+                        if (isPremiumUser) {
+                            TextButton(
+                                onClick = {
+                                    tunnelManager.setPremiumStatus(false)
+                                    showPremiumDialog = false
+                                }
+                            ) {
+                                Text("Switch to Free Tier (Test Ads)", color = Slate400)
+                            }
+                        } else {
+                            TextButton(onClick = { showPremiumDialog = false }) {
+                                Text("Keep Free Tier", color = Slate400)
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                tunnelManager.setPremiumStatus(true)
+                                showPremiumDialog = false
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Amber500)
+                        ) {
+                            Text(
+                                text = if (isPremiumUser) "👑 Pro Active" else "Activate Pro ($2.99/mo)",
+                                color = Color.Black,
+                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                            )
                         }
                     }
                 )

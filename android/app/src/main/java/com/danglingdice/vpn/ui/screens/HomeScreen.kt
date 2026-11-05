@@ -40,8 +40,11 @@ fun HomeScreen(
     selectedServer: ServerNode,
     dnsProfile: DnsProfile = DnsProfile.ADGUARD_SHIELD,
     stealthModeEnabled: Boolean = true,
+    isPremiumUser: Boolean = false,
     accountToken: String = "DD-ZERO-AUTH",
     onSelectDnsProfileClick: () -> Unit = {},
+    onUpgradePremiumClick: () -> Unit = {},
+    onAdBannerClick: () -> Unit = {},
     onPrivacyClick: () -> Unit = {},
     onToggleConnection: () -> Unit,
     onSelectServerClick: () -> Unit
@@ -90,9 +93,9 @@ fun HomeScreen(
                         color = Color.White
                     )
                     Text(
-                        text = "ID: $accountToken ⓘ",
-                        fontSize = 11.sp,
-                        color = Emerald500,
+                        text = if (isPremiumUser) "👑 PRO • $accountToken" else "FREE • $accountToken ⓘ",
+                        fontSize = 12.sp,
+                        color = if (isPremiumUser) Amber500 else Emerald500,
                         fontFamily = FontFamily.Monospace
                     )
                 }
@@ -140,7 +143,7 @@ fun HomeScreen(
                             ConnectionStatus.ERROR -> "CONNECTION ISSUE"
                             else -> "UNPROTECTED"
                         },
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = when (status) {
                             ConnectionStatus.CONNECTED -> Emerald500
@@ -153,10 +156,112 @@ fun HomeScreen(
             }
         }
 
-        // Center Hero 1-Tap Connect Dial
+        // Top Section: Ad Banner (Free Users Only) + Download & Upload Speed Box
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // Free-Tier Ad Banner (Positioned directly above Download Speed; removed on Premium Access)
+            if (!isPremiumUser) {
+                Surface(
+                    color = Slate900,
+                    shape = RoundedCornerShape(14.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Amber500.copy(alpha = 0.45f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onAdBannerClick() }
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Surface(
+                                color = Amber500.copy(alpha = 0.2f),
+                                shape = RoundedCornerShape(6.dp)
+                            ) {
+                                Text(
+                                    text = "AD",
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Amber500,
+                                    fontFamily = FontFamily.Monospace,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    text = "☁️ DigitalOcean Cloud • $200 Free Credit",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                                Text(
+                                    text = "Deploy high-speed VPS droplets in 60s ↗",
+                                    fontSize = 10.sp,
+                                    color = Slate400
+                                )
+                            }
+                        }
+
+                        Surface(
+                            onClick = onUpgradePremiumClick,
+                            color = Amber500,
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text(
+                                text = "Remove Ads 👑",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.Black,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Live Transfer Metrics (Download & Upload Box — Above Power Button)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Slate900, RoundedCornerShape(16.dp))
+                    .border(1.dp, Slate800, RoundedCornerShape(16.dp))
+                    .padding(14.dp),
+                horizontalArrangement = Arrangement.SpaceAround
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.ArrowDownward, contentDescription = null, tint = Emerald500, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Column {
+                        Text(text = "Download", fontSize = 12.sp, color = Slate400)
+                        Text(text = formatBytes(stats.rxBytes), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    }
+                }
+
+                Divider(modifier = Modifier.height(34.dp).width(1.dp), color = Slate800)
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.ArrowUpward, contentDescription = null, tint = Amber500, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Column {
+                        Text(text = "Upload", fontSize = 12.sp, color = Slate400)
+                        Text(text = formatBytes(stats.txBytes), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    }
+                }
+            }
+        }
+
+        // Center Hero 1-Tap Connect Dial (Power Button)
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(vertical = 16.dp)
+            modifier = Modifier.padding(vertical = 8.dp)
         ) {
             Box(
                 contentAlignment = Alignment.Center,
@@ -198,7 +303,7 @@ fun HomeScreen(
                     ConnectionStatus.ERROR -> "CONNECTION FAILED — TAP TO RETRY"
                     ConnectionStatus.DISCONNECTED -> "NOT CONNECTED"
                 },
-                fontSize = 17.sp,
+                fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
                 color = when (status) {
                     ConnectionStatus.CONNECTED -> Emerald500
@@ -220,51 +325,31 @@ fun HomeScreen(
 
             if (status == ConnectionStatus.CONNECTED) {
                 Text(
-                    text = formatDuration(stats.durationSeconds) + if (stealthModeEnabled) " • Stealth Anti-DPI" else "",
+                    text = "${formatDuration(stats.durationSeconds)} • ${dnsProfile.title}" + if (stealthModeEnabled) " • Stealth" else "",
                     fontSize = 12.sp,
                     fontFamily = FontFamily.Monospace,
                     color = Emerald500,
-                    modifier = Modifier.padding(top = 4.dp)
+                    modifier = Modifier.padding(top = 4.dp),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+            } else if (status == ConnectionStatus.DISCONNECTED) {
+                Text(
+                    text = dnsProfile.title + if (stealthModeEnabled) " • Stealth" else "",
+                    fontSize = 12.sp,
+                    fontFamily = FontFamily.Monospace,
+                    color = Slate400,
+                    modifier = Modifier.padding(top = 4.dp),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
                 )
             }
         }
 
-        // Bottom Stats, Multi-Profile DNS & Server Location Cards
+        // Bottom Cards (Shield box above Location button on the bottom)
         Column(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // Live Transfer Metrics
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Slate900, RoundedCornerShape(16.dp))
-                    .border(1.dp, Slate800, RoundedCornerShape(16.dp))
-                    .padding(14.dp),
-                horizontalArrangement = Arrangement.SpaceAround
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.ArrowDownward, contentDescription = null, tint = Emerald500, modifier = Modifier.size(20.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Column {
-                        Text(text = "Download", fontSize = 11.sp, color = Slate400)
-                        Text(text = formatBytes(stats.rxBytes), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                    }
-                }
-
-                Divider(modifier = Modifier.height(34.dp).width(1.dp), color = Slate800)
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.ArrowUpward, contentDescription = null, tint = Amber500, modifier = Modifier.size(20.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Column {
-                        Text(text = "Upload", fontSize = 11.sp, color = Slate400)
-                        Text(text = formatBytes(stats.txBytes), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                    }
-                }
-            }
-
-            // 4-Mode Security & Gaming DNS Profile Selector Card
+            // 4-Mode Security & Gaming DNS Profile Selector Card (Shield Box)
             Surface(
                 onClick = onSelectDnsProfileClick,
                 color = Slate900,
@@ -273,7 +358,7 @@ fun HomeScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                    modifier = Modifier.padding(14.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
@@ -281,7 +366,7 @@ fun HomeScreen(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 text = dnsProfile.title,
-                                fontSize = 13.sp,
+                                fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White
                             )
@@ -294,16 +379,17 @@ fun HomeScreen(
                                 fontFamily = FontFamily.Monospace
                             )
                         }
+                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = dnsProfile.subtitle,
-                            fontSize = 11.sp,
+                            fontSize = 12.sp,
                             color = Emerald500
                         )
                     }
                 }
             }
 
-            // Server Node Selection Card (Tap to Open Global Location Picker)
+            // Server Node Selection Card (Location Button on the Bottom)
             Surface(
                 onClick = onSelectServerClick,
                 color = Slate900,
@@ -316,12 +402,20 @@ fun HomeScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(text = selectedServer.flagEmoji, fontSize = 26.sp)
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(text = selectedServer.flagEmoji, fontSize = 24.sp)
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(text = selectedServer.name, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                Text(
+                                    text = selectedServer.name,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
                                     text = "CHANGE ▾",
@@ -331,6 +425,7 @@ fun HomeScreen(
                                     fontFamily = FontFamily.Monospace
                                 )
                             }
+                            Spacer(modifier = Modifier.height(2.dp))
                             Text(
                                 text = "${selectedServer.city} • ${selectedServer.loadPercent}% Load",
                                 fontSize = 12.sp,

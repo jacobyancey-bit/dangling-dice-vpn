@@ -74,6 +74,12 @@ class WireGuardTunnelManager(
     )
     val autoConnectWifiShield: StateFlow<Boolean> = _autoConnectWifiShield.asStateFlow()
 
+    // Premium Account Access Tier (Removes Ad Banner & Unlocks Pro Perks)
+    private val _isPremiumUser = MutableStateFlow(
+        prefs.getBoolean("is_premium_pro_tier", false)
+    )
+    val isPremiumUser: StateFlow<Boolean> = _isPremiumUser.asStateFlow()
+
     private val _servers = MutableStateFlow(defaultServerLocations())
     val servers: StateFlow<List<ServerNode>> = _servers.asStateFlow()
 
@@ -196,6 +202,17 @@ class WireGuardTunnelManager(
     fun setAutoConnectWifiShield(enabled: Boolean) {
         _autoConnectWifiShield.value = enabled
         prefs.edit().putBoolean("auto_connect_wifi_shield", enabled).apply()
+    }
+
+    fun setPremiumStatus(isPremium: Boolean) {
+        _isPremiumUser.value = isPremium
+        prefs.edit().putBoolean("is_premium_pro_tier", isPremium).apply()
+        scope.launch(Dispatchers.IO) {
+            apiClient.trackEvent(
+                if (isPremium) "premium_activated" else "premium_deactivated",
+                mapOf("account_token" to _accountToken.value)
+            )
+        }
     }
 
     fun selectServerLocation(server: ServerNode) {

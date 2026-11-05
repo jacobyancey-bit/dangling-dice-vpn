@@ -100,3 +100,4 @@ class DanglingQuickTileService : TileService() {
         tile.updateTile()
     }
 }
+
