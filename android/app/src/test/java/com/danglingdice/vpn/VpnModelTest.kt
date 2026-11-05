@@ -53,5 +53,13 @@ class VpnModelTest {
         assertEquals(ConnectionStatus.VERIFYING_HANDSHAKE, ConnectionStatus.valueOf("VERIFYING_HANDSHAKE"))
         assertEquals(ConnectionStatus.ERROR, ConnectionStatus.valueOf("ERROR"))
     }
+
+    @Test
+    fun testDnsProfile_resolvesAllFourSecurityModes() {
+        assertEquals("94.140.14.14", com.danglingdice.vpn.data.model.DnsProfile.fromId("adguard").primaryDns)
+        assertEquals("1.1.1.1", com.danglingdice.vpn.data.model.DnsProfile.fromId("gaming").primaryDns)
+        assertEquals("9.9.9.9", com.danglingdice.vpn.data.model.DnsProfile.fromId("quad9").primaryDns)
+        assertEquals("1.1.1.3", com.danglingdice.vpn.data.model.DnsProfile.fromId("family").primaryDns)
+    }
 }
 

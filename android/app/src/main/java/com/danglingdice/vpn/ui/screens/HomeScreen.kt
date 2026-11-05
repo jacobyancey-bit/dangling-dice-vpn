@@ -1,6 +1,7 @@
 package com.danglingdice.vpn.ui.screens
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -19,18 +20,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.danglingdice.vpn.R
 import com.danglingdice.vpn.data.model.ConnectionStatus
+import com.danglingdice.vpn.data.model.DnsProfile
 import com.danglingdice.vpn.data.model.ServerNode
 import com.danglingdice.vpn.data.model.TunnelStats
 import com.danglingdice.vpn.ui.theme.*
-
-import androidx.compose.foundation.Image
-import androidx.compose.ui.res.painterResource
-import com.danglingdice.vpn.R
 
 @Composable
 fun HomeScreen(
@@ -38,9 +38,10 @@ fun HomeScreen(
     statusDetail: String = "",
     stats: TunnelStats,
     selectedServer: ServerNode,
-    adBlockEnabled: Boolean = true,
+    dnsProfile: DnsProfile = DnsProfile.ADGUARD_SHIELD,
+    stealthModeEnabled: Boolean = true,
     accountToken: String = "DD-ZERO-AUTH",
-    onToggleAdBlock: (Boolean) -> Unit = {},
+    onSelectDnsProfileClick: () -> Unit = {},
     onPrivacyClick: () -> Unit = {},
     onToggleConnection: () -> Unit,
     onSelectServerClick: () -> Unit
@@ -61,7 +62,7 @@ fun HomeScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Slate950)
-            .padding(24.dp),
+            .padding(20.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceBetween
     ) {
@@ -155,12 +156,12 @@ fun HomeScreen(
         // Center Hero 1-Tap Connect Dial
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(vertical = 32.dp)
+            modifier = Modifier.padding(vertical = 16.dp)
         ) {
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
-                    .size(200.dp)
+                    .size(185.dp)
                     .clip(CircleShape)
                     .background(buttonBgColor.copy(alpha = 0.12f))
                     .border(
@@ -173,7 +174,7 @@ fun HomeScreen(
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
-                        .size(150.dp)
+                        .size(138.dp)
                         .clip(CircleShape)
                         .background(buttonBgColor)
                 ) {
@@ -181,12 +182,12 @@ fun HomeScreen(
                         imageVector = Icons.Default.PowerSettingsNew,
                         contentDescription = "Toggle VPN",
                         tint = if (status == ConnectionStatus.CONNECTED) Color.Black else Color.White,
-                        modifier = Modifier.size(54.dp)
+                        modifier = Modifier.size(50.dp)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
             Text(
                 text = when (status) {
@@ -197,7 +198,7 @@ fun HomeScreen(
                     ConnectionStatus.ERROR -> "CONNECTION FAILED — TAP TO RETRY"
                     ConnectionStatus.DISCONNECTED -> "NOT CONNECTED"
                 },
-                fontSize = 18.sp,
+                fontSize = 17.sp,
                 fontWeight = FontWeight.Bold,
                 color = when (status) {
                     ConnectionStatus.CONNECTED -> Emerald500
@@ -212,15 +213,15 @@ fun HomeScreen(
                     text = statusDetail,
                     fontSize = 12.sp,
                     color = if (status == ConnectionStatus.ERROR) Red500 else Slate400,
-                    modifier = Modifier.padding(top = 6.dp, start = 16.dp, end = 16.dp),
+                    modifier = Modifier.padding(top = 4.dp, start = 12.dp, end = 12.dp),
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
                 )
             }
 
             if (status == ConnectionStatus.CONNECTED) {
                 Text(
-                    text = formatDuration(stats.durationSeconds),
-                    fontSize = 13.sp,
+                    text = formatDuration(stats.durationSeconds) + if (stealthModeEnabled) " • Stealth Anti-DPI" else "",
+                    fontSize = 12.sp,
                     fontFamily = FontFamily.Monospace,
                     color = Emerald500,
                     modifier = Modifier.padding(top = 4.dp)
@@ -228,10 +229,10 @@ fun HomeScreen(
             }
         }
 
-        // Bottom Stats & Server Card
+        // Bottom Stats, Multi-Profile DNS & Server Location Cards
         Column(
             modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             // Live Transfer Metrics
             Row(
@@ -239,7 +240,7 @@ fun HomeScreen(
                     .fillMaxWidth()
                     .background(Slate900, RoundedCornerShape(16.dp))
                     .border(1.dp, Slate800, RoundedCornerShape(16.dp))
-                    .padding(16.dp),
+                    .padding(14.dp),
                 horizontalArrangement = Arrangement.SpaceAround
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -251,7 +252,7 @@ fun HomeScreen(
                     }
                 }
 
-                Divider(modifier = Modifier.height(36.dp).width(1.dp), color = Slate800)
+                Divider(modifier = Modifier.height(34.dp).width(1.dp), color = Slate800)
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.ArrowUpward, contentDescription = null, tint = Amber500, modifier = Modifier.size(20.dp))
@@ -263,39 +264,42 @@ fun HomeScreen(
                 }
             }
 
-            // 1-Tap Ad & Malware DNS Sinkhole Toggle Card
+            // 4-Mode Security & Gaming DNS Profile Selector Card
             Surface(
+                onClick = onSelectDnsProfileClick,
                 color = Slate900,
                 shape = RoundedCornerShape(16.dp),
                 border = androidx.compose.foundation.BorderStroke(1.dp, Slate800),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = dnsProfile.title,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "MODE ▾",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Emerald500,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
                         Text(
-                            text = "🛡️ Ad & Malware DNS Shield",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                        Text(
-                            text = if (adBlockEnabled) "Active: Blocking trackers via 94.140.14.14" else "Standard DNS (1.1.1.1)",
+                            text = dnsProfile.subtitle,
                             fontSize = 11.sp,
-                            color = if (adBlockEnabled) Emerald500 else Slate400
+                            color = Emerald500
                         )
                     }
-                    Switch(
-                        checked = adBlockEnabled,
-                        onCheckedChange = onToggleAdBlock,
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color.Black,
-                            checkedTrackColor = Emerald500
-                        )
-                    )
                 }
             }
 
@@ -308,7 +312,7 @@ fun HomeScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
-                    modifier = Modifier.padding(16.dp),
+                    modifier = Modifier.padding(14.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
@@ -378,5 +382,3 @@ fun HomeScreenPreview() {
         onSelectServerClick = {}
     )
 }
-
-

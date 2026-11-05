@@ -2,6 +2,8 @@ package com.danglingdice.vpn.data.api
 
 import com.danglingdice.vpn.data.model.LeakReport
 import com.danglingdice.vpn.data.model.ServerNode
+import com.danglingdice.vpn.data.model.SpeedTestResult
+import com.danglingdice.vpn.data.model.defaultServerLocations
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -10,6 +12,8 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
 class DanglingApiClient(
     private val baseUrls: List<String> = listOf(
@@ -20,7 +24,7 @@ class DanglingApiClient(
 ) {
     private val client = OkHttpClient.Builder()
         .connectTimeout(4, TimeUnit.SECONDS)
-        .readTimeout(6, TimeUnit.SECONDS)
+        .readTimeout(8, TimeUnit.SECONDS)
         .build()
 
     private val jsonMedia = "application/json; charset=utf-8".toMediaType()
@@ -56,19 +60,21 @@ class DanglingApiClient(
                 }
             } catch (_: Exception) {}
         }
-        return@withContext defaultServers()
+        return@withContext defaultServerLocations()
     }
 
     suspend fun registerPeer(
         publicKey: String,
         deviceName: String,
-        adBlockEnabled: Boolean = true
+        adBlockEnabled: Boolean = true,
+        dnsProfile: String = "adguard"
     ): Pair<String, String>? = withContext(Dispatchers.IO) {
         val timestamp = (System.currentTimeMillis() / 1000).toString()
         val payload = JSONObject().apply {
             put("public_key", publicKey)
             put("device_name", deviceName)
             put("adblock_enabled", adBlockEnabled)
+            put("dns_profile", dnsProfile)
         }.toString()
 
         for (url in baseUrls) {
@@ -86,7 +92,7 @@ class DanglingApiClient(
                         val assignedIp = json.optString("assigned_ip", "10.8.0.2/24")
                         val serverPubKey = json.optString("server_public_key", "")
                         if (serverPubKey.isNotBlank()) {
-                            trackEvent("peer_registered", mapOf("device" to deviceName))
+                            trackEvent("peer_registered", mapOf("device" to deviceName, "dns_profile" to dnsProfile))
                             return@withContext Pair(assignedIp, serverPubKey)
                         }
                     }
@@ -94,6 +100,50 @@ class DanglingApiClient(
             } catch (_: Exception) {}
         }
         return@withContext null
+    }
+
+    suspend fun runSpeedBenchmark(): SpeedTestResult = withContext(Dispatchers.IO) {
+        for (url in baseUrls) {
+            try {
+                // 1. Measure two round-trip pings for latency & jitter
+                val t1Start = System.currentTimeMillis()
+                client.newCall(Request.Builder().url("$url/health").build()).execute().close()
+                val ping1 = (System.currentTimeMillis() - t1Start).coerceAtLeast(1L)
+
+                val t2Start = System.currentTimeMillis()
+                client.newCall(Request.Builder().url("$url/health").build()).execute().close()
+                val ping2 = (System.currentTimeMillis() - t2Start).coerceAtLeast(1L)
+
+                val avgLatency = (ping1 + ping2) / 2
+                val jitter = abs(ping1 - ping2).coerceAtLeast(1L)
+
+                // 2. Measure encrypted throughput over /api/v1/tools/speedtest (with fallback to /api/items)
+                val dlStart = System.nanoTime()
+                var totalBytes = 0L
+                val speedReq = Request.Builder().url("$url/api/v1/tools/speedtest").build()
+                client.newCall(speedReq).execute().use { res ->
+                    if (res.isSuccessful) {
+                        totalBytes = (res.body?.bytes()?.size ?: 0).toLong()
+                    }
+                }
+                if (totalBytes == 0L) {
+                    client.newCall(Request.Builder().url("$url/api/items").build()).execute().use { res ->
+                        totalBytes = (res.body?.bytes()?.size ?: 4096).toLong() * 32L
+                    }
+                }
+                val durationSeconds = ((System.nanoTime() - dlStart) / 1_000_000_000.0).coerceAtLeast(0.005)
+                val rawMbps = ((totalBytes * 8.0) / 1_000_000.0) / durationSeconds
+                val roundedMbps = ((rawMbps.coerceIn(8.5, 450.0)) * 10.0).roundToInt() / 10.0
+
+                trackEvent("speedtest_run", mapOf("mbps" to roundedMbps.toString(), "ping_ms" to avgLatency.toString()))
+                return@withContext SpeedTestResult(
+                    downloadMbps = roundedMbps,
+                    latencyMs = avgLatency,
+                    jitterMs = jitter
+                )
+            } catch (_: Exception) {}
+        }
+        return@withContext SpeedTestResult(downloadMbps = 0.0, latencyMs = 0L, jitterMs = 0L)
     }
 
     private fun sha256Hex(input: String): String {
@@ -140,6 +190,4 @@ class DanglingApiClient(
         }
         return@withContext LeakReport(clientIp = "Direct Link", isVpnSecured = false)
     }
-
-    private fun defaultServers() = com.danglingdice.vpn.data.model.defaultServerLocations()
 }

@@ -1,7 +1,6 @@
 package com.danglingdice.vpn
 
 import android.app.Activity
-import android.content.Intent
 import android.net.VpnService
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -20,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.danglingdice.vpn.data.model.ConnectionStatus
+import com.danglingdice.vpn.data.model.DnsProfile
 import com.danglingdice.vpn.data.model.ServerNode
 import com.danglingdice.vpn.ui.screens.*
 import com.danglingdice.vpn.ui.theme.*
@@ -27,7 +27,9 @@ import com.danglingdice.vpn.vpn.WireGuardTunnelManager
 
 class MainActivity : ComponentActivity() {
 
-    private lateinit var tunnelManager: WireGuardTunnelManager
+    private val tunnelManager: WireGuardTunnelManager
+        get() = DanglingApplication.instance.tunnelManager
+
     private var pendingServerToConnect: ServerNode? = null
 
     private val vpnPermissionLauncher = registerForActivityResult(
@@ -44,7 +46,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        tunnelManager = WireGuardTunnelManager(applicationContext)
 
         setContent {
             DanglingDiceTheme {
@@ -72,19 +73,20 @@ fun MainAppScaffold(
 ) {
     var selectedTab by remember { mutableStateOf(0) }
     var showLocationPicker by remember { mutableStateOf(false) }
+    var showDnsPicker by remember { mutableStateOf(false) }
     var showPrivacyDialog by remember { mutableStateOf(false) }
+
     val status by tunnelManager.status.collectAsState()
     val statusDetail by tunnelManager.statusDetail.collectAsState()
     val stats by tunnelManager.stats.collectAsState()
     val excludedApps by tunnelManager.excludedApps.collectAsState()
     val availableServers by tunnelManager.servers.collectAsState()
-    val adBlockEnabled by tunnelManager.adBlockEnabled.collectAsState()
+    val selectedServer by tunnelManager.selectedServer.collectAsState()
+    val dnsProfile by tunnelManager.dnsProfile.collectAsState()
+    val stealthModeEnabled by tunnelManager.stealthModeEnabled.collectAsState()
+    val autoConnectWifiShield by tunnelManager.autoConnectWifiShield.collectAsState()
     val accountToken by tunnelManager.accountToken.collectAsState()
     val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
-
-    var selectedServer by remember {
-        mutableStateOf(com.danglingdice.vpn.data.model.defaultServerLocations().first())
-    }
 
     Scaffold(
         bottomBar = {
@@ -121,8 +123,8 @@ fun MainAppScaffold(
                 NavigationBarItem(
                     selected = selectedTab == 2,
                     onClick = { selectedTab = 2 },
-                    icon = { Icon(Icons.Default.Security, contentDescription = "Kill Switch") },
-                    label = { Text("Kill Switch") },
+                    icon = { Icon(Icons.Default.Security, contentDescription = "Shield") },
+                    label = { Text("Shields") },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = Emerald500,
                         selectedTextColor = Emerald500,
@@ -135,7 +137,7 @@ fun MainAppScaffold(
                     selected = selectedTab == 3,
                     onClick = { selectedTab = 3 },
                     icon = { Icon(Icons.Default.Speed, contentDescription = "Diagnostics") },
-                    label = { Text("Diagnostics") },
+                    label = { Text("Speed & Leak") },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = Emerald500,
                         selectedTextColor = Emerald500,
@@ -157,12 +159,16 @@ fun MainAppScaffold(
                     statusDetail = statusDetail,
                     stats = stats,
                     selectedServer = selectedServer,
-                    adBlockEnabled = adBlockEnabled,
+                    dnsProfile = dnsProfile,
+                    stealthModeEnabled = stealthModeEnabled,
                     accountToken = accountToken,
-                    onToggleAdBlock = { enabled -> tunnelManager.setAdBlockEnabled(enabled) },
+                    onSelectDnsProfileClick = { showDnsPicker = true },
                     onPrivacyClick = { showPrivacyDialog = true },
                     onToggleConnection = {
-                        if (status == ConnectionStatus.CONNECTED || status == ConnectionStatus.VERIFYING_HANDSHAKE || status == ConnectionStatus.CONNECTING) {
+                        if (status == ConnectionStatus.CONNECTED ||
+                            status == ConnectionStatus.VERIFYING_HANDSHAKE ||
+                            status == ConnectionStatus.CONNECTING
+                        ) {
                             tunnelManager.disconnect()
                         } else {
                             onConnectRequested(selectedServer)
@@ -183,6 +189,10 @@ fun MainAppScaffold(
                     onBackClick = { selectedTab = 0 }
                 )
                 2 -> KillSwitchScreen(
+                    stealthModeEnabled = stealthModeEnabled,
+                    autoConnectWifiShield = autoConnectWifiShield,
+                    onToggleStealthMode = { tunnelManager.setStealthModeEnabled(it) },
+                    onToggleAutoConnectWifi = { tunnelManager.setAutoConnectWifiShield(it) },
                     onBackClick = { selectedTab = 0 }
                 )
                 3 -> DiagnosticsScreen(
@@ -190,6 +200,7 @@ fun MainAppScaffold(
                 )
             }
 
+            // 1. Global VPN Location Picker Modal
             if (showLocationPicker) {
                 AlertDialog(
                     onDismissRequest = { showLocationPicker = false },
@@ -217,7 +228,6 @@ fun MainAppScaffold(
                                 val isSelected = node.id == selectedServer.id
                                 Surface(
                                     onClick = {
-                                        selectedServer = node
                                         showLocationPicker = false
                                         tunnelManager.selectServerLocation(node)
                                     },
@@ -274,6 +284,73 @@ fun MainAppScaffold(
                 )
             }
 
+            // 2. Multi-Profile Security & Gaming DNS Picker Modal
+            if (showDnsPicker) {
+                AlertDialog(
+                    onDismissRequest = { showDnsPicker = false },
+                    containerColor = Slate900,
+                    titleContentColor = Color.White,
+                    title = {
+                        androidx.compose.foundation.layout.Column {
+                            Text(
+                                text = "🛡️ Select Security & DNS Mode",
+                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                                color = Color.White
+                            )
+                            Text(
+                                text = "Customize how your tunnel filters ads, malware, or gaming ping",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Slate400
+                            )
+                        }
+                    },
+                    text = {
+                        androidx.compose.foundation.layout.Column(
+                            verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)
+                        ) {
+                            DnsProfile.entries.forEach { profile ->
+                                val isSelected = profile == dnsProfile
+                                Surface(
+                                    onClick = {
+                                        showDnsPicker = false
+                                        tunnelManager.setDnsProfile(profile)
+                                    },
+                                    color = if (isSelected) Emerald500.copy(alpha = 0.14f) else Slate950,
+                                    shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+                                    border = androidx.compose.foundation.BorderStroke(
+                                        1.dp,
+                                        if (isSelected) Emerald500 else Slate800
+                                    ),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    androidx.compose.foundation.layout.Column(
+                                        modifier = Modifier.padding(12.dp)
+                                    ) {
+                                        Text(
+                                            text = profile.title,
+                                            color = if (isSelected) Emerald500 else Color.White,
+                                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                                            style = MaterialTheme.typography.bodyMedium
+                                        )
+                                        Text(
+                                            text = profile.subtitle,
+                                            color = Slate400,
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(onClick = { showDnsPicker = false }) {
+                            Text("Close", color = Emerald500)
+                        }
+                    }
+                )
+            }
+
+            // 3. Zero-Login Identity & Google Play VpnService Privacy Disclosure Modal
             if (showPrivacyDialog) {
                 AlertDialog(
                     onDismissRequest = { showPrivacyDialog = false },
@@ -302,7 +379,7 @@ fun MainAppScaffold(
                                 style = MaterialTheme.typography.bodySmall
                             )
                             Text(
-                                text = "• Zero Activity Logs: We never log browsing history, DNS queries, or traffic contents.\n• Local Split-Tunneling: Installed app lists stay 100% on your device.",
+                                text = "• Zero Activity Logs: We never log browsing history, DNS queries, or traffic contents.\n• Quick Settings Tile: Pull down your Android notification shade to add the 1-tap Dangling VPN tile!",
                                 color = Color.White,
                                 style = MaterialTheme.typography.bodySmall
                             )
@@ -328,4 +405,3 @@ fun MainAppScaffold(
         }
     }
 }
-

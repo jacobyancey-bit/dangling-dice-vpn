@@ -12,6 +12,48 @@ data class ServerNode(
     val loadPercent: Int = 14
 )
 
+enum class DnsProfile(
+    val id: String,
+    val title: String,
+    val subtitle: String,
+    val primaryDns: String
+) {
+    ADGUARD_SHIELD(
+        id = "adguard",
+        title = "🛡️ Ad, Tracker & Malware Shield",
+        subtitle = "AdGuard Sinkhole (94.140.14.14)",
+        primaryDns = "94.140.14.14"
+    ),
+    GAMING_STREAMING(
+        id = "gaming",
+        title = "⚡ Low-Latency Gaming & Streaming",
+        subtitle = "Cloudflare Direct Edge (1.1.1.1)",
+        primaryDns = "1.1.1.1"
+    ),
+    QUAD9_THREAT(
+        id = "quad9",
+        title = "🔒 Swiss Phishing & Threat Intel",
+        subtitle = "Quad9 Security DNS (9.9.9.9)",
+        primaryDns = "9.9.9.9"
+    ),
+    FAMILY_SAFE(
+        id = "family",
+        title = "👨‍👩‍👧 Family & Adult Content Blocker",
+        subtitle = "Cloudflare Family Shield (1.1.1.3)",
+        primaryDns = "1.1.1.3"
+    );
+
+    companion object {
+        fun fromId(id: String?): DnsProfile = entries.find { it.id == id } ?: ADGUARD_SHIELD
+    }
+}
+
+data class SpeedTestResult(
+    val downloadMbps: Double = 0.0,
+    val latencyMs: Long = 0L,
+    val jitterMs: Long = 0L
+)
+
 fun defaultServerLocations(endpoint: String = "165.245.142.71:51820", pubKey: String = ""): List<ServerNode> = listOf(
     ServerNode(
         id = "us-east-1",

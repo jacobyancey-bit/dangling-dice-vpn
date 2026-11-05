@@ -172,4 +172,24 @@ func TestZeroLoginIdempotentPeerRegistration(t *testing.T) {
 	}
 }
 
+func TestSpeedBenchmarkAndDNSProfiles(t *testing.T) {
+	state := newTestServerState()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/tools/speedtest", nil)
+	rr := httptest.NewRecorder()
+	state.handleSpeedTest(rr, req)
+
+	if rr.Code != http.StatusOK || rr.Body.Len() != 262144 {
+		t.Fatalf("Expected 256KB speedtest payload (262144 bytes), got status %d and %d bytes", rr.Code, rr.Body.Len())
+	}
+
+	if got := resolveDNSProfile("quad9", false, "1.1.1.1"); !strings.Contains(got, "9.9.9.9") {
+		t.Errorf("Expected Quad9 DNS for 'quad9' profile, got %s", got)
+	}
+	if got := resolveDNSProfile("family", false, "1.1.1.1"); !strings.Contains(got, "1.1.1.3") {
+		t.Errorf("Expected Family Shield DNS for 'family' profile, got %s", got)
+	}
+}
+
+
 

@@ -47,6 +47,18 @@
             </intent-filter>
         </service>
 
+        <!-- Android Notification Shade Quick Settings Tile (1-Tap VPN Toggle) -->
+        <service
+            android:name=".vpn.DanglingQuickTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_logo"
+            android:label="Dangling Dice VPN"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
     </application>
 
 </manifest>

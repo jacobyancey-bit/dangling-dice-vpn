@@ -107,6 +107,7 @@ func main() {
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Get("/servers", state.handleListServers)
 		r.Get("/tools/diagnostics", state.handleDiagnostics)
+		r.Get("/tools/speedtest", state.handleSpeedTest)
 		r.Post("/peers/register", state.handleRegisterPeer)
 		r.Post("/tools/guest-config", state.handleGenerateGuestConfig)
 		r.Post("/tools/dev-tunnel", state.handleCreateDevTunnel)
@@ -265,6 +266,17 @@ func (s *ServerState) handleDiagnostics(w http.ResponseWriter, r *http.Request) 
 	})
 }
 
+// Handler: Encrypted Tunnel Speed & Latency Benchmark Payload (256 KB RAM stream)
+func (s *ServerState) handleSpeedTest(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate")
+	chunk := []byte("DANGLING_DICE_WIREGUARD_SPEEDTEST_BLOCK_64BYTES_0123456789ABCDEF")
+	w.WriteHeader(http.StatusOK)
+	for i := 0; i < 4096; i++ { // 4096 * 64B = 262,144 bytes (256 KB)
+		_, _ = w.Write(chunk)
+	}
+}
+
 // Handler: List available VPN servers
 func (s *ServerState) handleListServers(w http.ResponseWriter, r *http.Request) {
 	ep := fmt.Sprintf("%s:%s", s.cfg.ServerPublicIP, s.cfg.VPNListenPort)
@@ -344,6 +356,7 @@ type RegisterPeerRequest struct {
 	DeviceName     string `json:"device_name"`
 	PublicKey      string `json:"public_key"`
 	AdBlockEnabled bool   `json:"adblock_enabled"`
+	DNSProfile     string `json:"dns_profile,omitempty"`
 }
 
 // Handler: Register peer with WireGuard (Zero-Login Cryptographic Device Auth)
@@ -386,11 +399,7 @@ func (s *ServerState) handleRegisterPeer(w http.ResponseWriter, r *http.Request)
 	}
 	s.mu.Unlock()
 
-	dnsServer := s.cfg.VPNDNSServer
-	if req.AdBlockEnabled {
-		// AdGuard DNS Sinkhole (Blocks Ads, Trackers, and Malware at DNS level)
-		dnsServer = "94.140.14.14, 94.140.15.15"
-	}
+	dnsServer := resolveDNSProfile(req.DNSProfile, req.AdBlockEnabled, s.cfg.VPNDNSServer)
 
 	// Derive deterministic Zero-Login Account Token from device's Curve25519 PublicKey
 	accountToken := deriveAccountToken(req.PublicKey)
@@ -731,6 +740,23 @@ func (s *ServerState) applyWireGuardPeer(pubKey, assignedIP string) {
 func isValidWireGuardKey(pubKey string) bool {
 	decoded, err := base64.StdEncoding.DecodeString(strings.TrimSpace(pubKey))
 	return err == nil && len(decoded) == 32
+}
+
+func resolveDNSProfile(profile string, adBlockEnabled bool, fallback string) string {
+	switch strings.ToLower(strings.TrimSpace(profile)) {
+	case "adguard", "adblock":
+		return "94.140.14.14, 94.140.15.15"
+	case "gaming", "cloudflare":
+		return "1.1.1.1, 1.0.0.1"
+	case "quad9", "threat":
+		return "9.9.9.9, 149.112.112.112"
+	case "family", "safesearch":
+		return "1.1.1.3, 1.0.0.3"
+	}
+	if adBlockEnabled {
+		return "94.140.14.14, 94.140.15.15"
+	}
+	return fallback
 }
 
 func deriveAccountToken(pubKey string) string {
