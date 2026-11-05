@@ -52,3 +52,4 @@ class VpnModelTest {
         assertEquals(ConnectionStatus.DISCONNECTED, ConnectionStatus.valueOf("DISCONNECTED"))
     }
 }
+

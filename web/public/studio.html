@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="referrer" content="strict-origin-when-cross-origin" />
+  <title>Dangling Dice Studios™ | Music Production, Coding, Phone Apps & Developer Tools</title>
+  <meta name="description" content="Official platform for Dangling Dice Studios™. Featuring Dangling Beats music showcases, smart Android mobile apps, full-stack engineering masterclasses, and high-utility developer tools." />
+  
+  <!-- Open Graph & Social Cards -->
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Dangling Dice Studios™ | Music, Code, Phone Apps & Dev Tools" />
+  <meta property="og:description" content="Discover beats on Dangling Beats, explore our AI Calculator on Google Play, learn full-stack development, and use free client-side developer tools." />
+  <meta property="og:image" content="/images/banner.jpg" />
+  <meta property="og:url" content="https://danglingdice.com" />
+  
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Dangling Dice Studios™" />
+  <meta name="twitter:description" content="Where beat production meets code craft, phone apps, and developer tools." />
+  <meta name="twitter:image" content="/images/banner.jpg" />
+
+  <!-- Schema.org Structured Metadata (JSON-LD) -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": "https://danglingdice.com/#organization",
+        "name": "Dangling Dice Studios™",
+        "url": "https://danglingdice.com",
+        "logo": "https://danglingdice.com/images/logo.png",
+        "sameAs": [
+          "https://www.youtube.com/@danglingdicestudios",
+          "https://play.google.com/store/apps/details?id=com.danglingdicestudios.aicalculator",
+          "https://github.com/jacobyancey-bit"
+        ]
+      },
+      {
+        "@type": "WebApplication",
+        "name": "MongoDB Connection URI & Query Inspector",
+        "applicationCategory": "DeveloperApplication",
+        "operatingSystem": "All",
+        "browserRequirements": "Requires JavaScript",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        }
+      }
+    ]
+  }
+  </script>
+
+  <link rel="icon" type="image/png" href="/images/logo.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/main.css" />
+</head>
+<body>
+  <!-- ==========================================================================
+       Site Header Section
+       ========================================================================== -->
+  <header>
+    <div class="nav-container">
+      <a href="/" class="brand">
+        <img src="/images/logo.png" alt="Dangling Dice Studios™" class="brand-logo-img" />
+        <div>
+          <div class="brand-title">Dangling Dice Studios™</div>
+          <div class="brand-tagline">Music &bull; Code &bull; Apps &bull; Dev Tools</div>
+        </div>
+      </a>
+
+      <nav class="nav-links">
+  <a href="#divisions" class="nav-link">Studios</a>
+  <a href="#catalog" class="nav-link">Catalog & Apps</a>
+  <a href="#vpnTool" class="nav-link">🛡️ Free VPN</a>
+  <a href="#mongoInspector" class="nav-link">Dev Tools</a>
+        <a href="https://www.youtube.com/@danglingdicestudios" target="_blank" rel="noopener noreferrer" class="btn btn-youtube btn-sm">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+          YouTube
+        </a>
+        <a href="https://github.com/jacobyancey-bit" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+          GitHub
+        </a>
+        <a href="https://www.linkedin.com/in/jacob-yancey-085151372" target="_blank" rel="noopener noreferrer" class="btn btn-linkedin btn-sm">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
+          LinkedIn
+        </a>
+        <div id="connectionStatus" class="status-badge">
+          <span class="status-dot"></span>
+          <span id="statusLabel">Checking API...</span>
+        </div>
+      </nav>
+    </div>
+  </header>
+
+  <!-- ==========================================================================
+       Main Content Section
+       ========================================================================== -->
+  <main>
+    <!-- Hero Banner -->
+    <section class="hero-banner">
+      <img src="/images/banner.jpg" alt="Dangling Dice Studios™ Workspace" class="hero-img" />
+      <div class="hero-overlay">
+        <div class="hero-pill">Official Hub &bull; Dangling Dice Studios™</div>
+        <h1 class="hero-title">Where Beat Production Meets Code Craft, Phone Apps & Creative Games</h1>
+        <p class="hero-description">
+          Welcome to the creative nexus of Dangling Dice Studios™. Watch music production on <strong>Dangling Beats</strong>, download our smart mobile apps like the <strong>AI Calculator</strong> on Google Play, master full-stack software development with <strong>Dangling Dice Coding</strong>, and explore custom games.
+        </p>
+        <div class="hero-actions">
+          <a href="https://www.youtube.com/@danglingdicestudios" target="_blank" rel="noopener noreferrer" class="btn btn-youtube">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+            Watch @danglingdicestudios
+          </a>
+          <a href="#catalog" class="btn btn-primary" onclick="filterCategory('Coding Tutorials')">💻 Learn Coding</a>
+          <a href="#catalog" class="btn btn-playstore" onclick="filterCategory('Mobile Apps')">📱 Mobile Apps</a>
+          <a href="#catalog" class="btn btn-purple" onclick="filterCategory('Beats & Audio')">🎧 Dangling Beats</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- Studio Divisions Showcase -->
+    <section id="divisions" class="divisions-grid">
+      <!-- Dangling Beats Studio -->
+      <div class="division-card card-beats">
+        <div>
+          <div class="division-icon">🎧</div>
+          <h3>Dangling Beats Studio</h3>
+          <p>The sound lab behind Dangling Dice. Releasing original lofi, dark trap, synthwave, and chillhop instrumentals on YouTube. Ideal for late-night programming sessions and video content.</p>
+        </div>
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+          <a href="https://www.youtube.com/@danglingdicestudios" target="_blank" rel="noopener noreferrer" class="btn btn-youtube btn-sm">▶ YouTube Channel</a>
+          <button class="btn btn-secondary btn-sm" onclick="filterCategory('Beats & Audio')">View Beat Catalog</button>
+        </div>
+      </div>
+
+      <!-- Dangling Dice Coding -->
+      <div class="division-card card-coding">
+        <div>
+          <div class="division-icon">💻</div>
+          <h3>Dangling Dice Coding</h3>
+          <p>Practical coding tutorials showing you how to build real-world software. From modern full-stack web applications and APIs to physics engines and game development.</p>
+        </div>
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+          <a href="https://github.com/jacobyancey-bit" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+            GitHub @jacobyancey-bit
+          </a>
+          <button class="btn btn-secondary btn-sm" onclick="filterCategory('Coding Tutorials')">Browse Tutorials</button>
+        </div>
+      </div>
+
+      <!-- Mobile Apps & Software -->
+      <div class="division-card card-apps">
+        <div>
+          <div class="division-icon">📱</div>
+          <h3>Mobile Apps & Software</h3>
+          <p>Intelligent mobile applications published on the Google Play Store. Featuring our flagship AI Calculator app, step-by-step homework solvers, and mobile utilities.</p>
+        </div>
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+          <a href="https://play.google.com/store/apps/details?id=com.danglingdicestudios.aicalculator" target="_blank" rel="noopener noreferrer" class="btn btn-playstore btn-sm">▶ AI Calculator on Google Play</a>
+          <button class="btn btn-secondary btn-sm" onclick="filterCategory('Mobile Apps')">View Mobile Apps</button>
+        </div>
+      </div>
+
+            <!-- Developer Tools & Utilities -->
+      <div class="division-card card-games">
+        <div>
+          <div class="division-icon">🛠️</div>
+          <h3>Developer Tools & Utilities</h3>
+          <p>High-utility browser and standalone software tools. Instant connection string validators, formatters, and network privacy utilities built for engineers.</p>
+        </div>
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+          <a href="#vpnTool" class="btn btn-primary btn-sm">Launch Free VPN 🛡️</a>
+          <a href="#mongoInspector" class="btn btn-secondary btn-sm">URI Inspector ⚡</a>
+          <button class="btn btn-secondary btn-sm" onclick="filterCategory('Developer Tools')">Explore Dev Tools</button>
+        </div>
+      </div>
+
+    <!-- Content & Catalog Layout -->
+    <div class="content-layout">
+      <!-- Catalog Grid & Showcase -->
+      <section id="catalog">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">📚 Studio Catalog & Content Releases</h2>
+              <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem;">Live data served by Node.js Express REST API & MongoDB</p>
+            </div>
+            <span id="countBadge" class="status-badge" style="background: rgba(6, 182, 212, 0.12); color: var(--neon-cyan); border-color: rgba(6, 182, 212, 0.3);">0 Items</span>
+          </div>
+
+          <!-- Catalog Search & Sort Controls -->
+          <div class="catalog-toolbar">
+            <div class="search-box-wrapper">
+              <span class="search-icon">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              </span>
+              <input type="text" id="catalogSearchInput" class="catalog-search-input" placeholder="Search by title, description, or tags (e.g. #calculator, #synthwave)..." oninput="handleSearch(this.value)" />
+              <button id="searchClearBtn" class="search-clear-btn" onclick="clearSearch()" title="Clear search">&times;</button>
+            </div>
+            <div class="sort-box-wrapper">
+              <label for="catalogSortSelect" class="sort-label">Sort by:</label>
+              <select id="catalogSortSelect" class="catalog-sort-select" onchange="handleSort(this.value)">
+                <option value="newest">Newest Releases</option>
+                <option value="alpha">Title (A - Z)</option>
+                <option value="price-low">Price (Free First)</option>
+                <option value="price-high">Price (Highest First)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Category Filter Pills -->
+          <div class="filter-pills">
+            <button class="pill-btn active" onclick="filterCategory('All')">All Content</button>
+            <button class="pill-btn" onclick="filterCategory('Coding Tutorials')">💻 Coding Tutorials</button>
+            <button class="pill-btn" onclick="filterCategory('Beats & Audio')">🎧 Beats & Audio</button>
+            <button class="pill-btn" onclick="filterCategory('Mobile Apps')">📱 Mobile Apps</button>
+            <button class="pill-btn" onclick="filterCategory('Developer Tools')">🛠️ Dev Tools & Utilities</button>
+          </div>
+
+          <div id="resourcesGrid" class="resources-grid">
+            <div style="grid-column: 1 / -1; text-align: center; padding: 3rem; color: var(--text-muted);">
+              Loading studio catalog from MongoDB...
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+        <!-- ======================================================================
+         Interactive Standalone Utility: MongoDB URI & Query Inspector
+         ====================================================================== -->
+    <section id="mongoInspector" class="card" style="margin-top: 2rem; border-color: rgba(16, 185, 129, 0.3);">
+      <div class="card-header">
+        <div>
+          <div class="pill-tag pill-tag-emerald" style="display: inline-block; margin-bottom: 0.4rem;">
+            🛠️ Client-Side Web Utility &bull; Zero Server Transmission
+          </div>
+          <h2 class="card-title">MongoDB Connection URI & Query Inspector</h2>
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem;">
+            Quickly debug, sanitize, and validate MongoDB connection strings. Detects unescaped password symbols that break Mongoose, parses replica sets, and outputs clean environment variable configurations.
+          </p>
+        </div>
+        <span class="status-badge" style="background: rgba(16, 185, 129, 0.12); color: var(--neon-emerald); border-color: rgba(16, 185, 129, 0.3);">
+          100% Private (Browser-Only)
+        </span>
+      </div>
+
+      <div style="padding: 1.5rem;">
+        <label for="uriInput" style="display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 0.5rem; color: var(--text-main);">
+          Paste MongoDB Connection String (Standard or SRV):
+        </label>
+        <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+          <input
+            type="text"
+            id="uriInput"
+            class="catalog-search-input"
+            style="flex: 1;"
+            placeholder="mongodb+srv://admin:MyPass123!@cluster0.abcde.mongodb.net/my_database?retryWrites=true&w=majority"
+            oninput="inspectMongoUri(this.value)"
+          />
+          <button type="button" class="btn btn-secondary" onclick="loadSampleUri()">Load Sample</button>
+        </div>
+
+        <!-- Real-Time Inspection Results -->
+        <div id="inspectorResults" style="display: none; background: #080c14; border: 1px solid var(--border-glow); border-radius: var(--radius-md); padding: 1.25rem;">
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
+            <div>
+              <span style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Protocol:</span>
+              <div id="resProtocol" style="font-family: var(--font-mono); font-weight: 600; color: var(--neon-cyan);">—</div>
+            </div>
+            <div>
+              <span style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Host / Cluster:</span>
+              <div id="resHost" style="font-family: var(--font-mono); font-weight: 600; color: var(--text-main);">—</div>
+            </div>
+            <div>
+              <span style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Database Name:</span>
+              <div id="resDb" style="font-family: var(--font-mono); font-weight: 600; color: var(--neon-purple);">—</div>
+            </div>
+            <div>
+              <span style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Status:</span>
+              <div id="resHealth" style="font-weight: 600; color: var(--neon-emerald);">Valid Format</div>
+            </div>
+          </div>
+
+          <div id="uriWarningBox" style="display: none; background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: var(--radius-sm); padding: 0.75rem; margin-bottom: 1rem; color: #fca5a5; font-size: 0.85rem;">
+          </div>
+
+          <label style="display: block; font-weight: 600; font-size: 0.8rem; margin-bottom: 0.3rem; color: var(--text-muted);">
+            Generated .env Snippet:
+          </label>
+          <div style="position: relative;">
+            <pre id="envOutputSnippet" style="background: #030712; padding: 0.75rem; border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: 0.8rem; overflow-x: auto; color: #67e8f9; margin: 0;"></pre>
+            <button type="button" class="btn btn-secondary btn-sm" style="position: absolute; top: 0.5rem; right: 0.5rem;" onclick="copyEnvSnippet()">Copy .env</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================================================================
+         Interactive Standalone Utility: Dangling Dice WireGuard VPN & Privacy Shield
+         ====================================================================== -->
+    <section id="vpnTool" class="card" style="margin-top: 2rem; border-color: rgba(16, 185, 129, 0.3);">
+      <div class="card-header">
+        <div>
+          <div class="pill-tag pill-tag-emerald" style="display: inline-block; margin-bottom: 0.4rem;">
+            🛡️ High-Performance Network Shield &bull; Zero Server Logs
+          </div>
+          <h2 class="card-title">Dangling Dice WireGuard VPN & Leak Shield</h2>
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem;">
+            Instant, in-kernel encrypted WireGuard VPN for developers. Protect your local traffic, detect WebRTC/DNS leaks, and connect your Android device.
+          </p>
+        </div>
+        <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+          <a href="/vpn" class="btn btn-primary btn-sm">Open Standalone VPN Portal ↗</a>
+          <a href="/admin" class="btn btn-secondary btn-sm">📊 SSOT Analytics</a>
+          <span class="status-badge" style="background: rgba(16, 185, 129, 0.12); color: var(--neon-emerald); border-color: rgba(16, 185, 129, 0.3);">
+            100% Free Developer Tool
+          </span>
+        </div>
+      </div>
+
+      <div style="padding: 1.5rem;">
+        <!-- Single Source of Truth (SSOT) Interactive VPN & Telemetry Widget -->
+        <div id="dangling-dice-vpn-widget"></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Load Standalone VPN Client Widget & Telemetry Engine -->
+  <script src="/vpn-widget.js" async></script>
+
+  <!-- Cinema Player Modal for YouTube Videos & Playlists -->
+  <div id="cinemaModal" style="display: none; position: fixed; inset: 0; z-index: 999; background: rgba(0, 0, 0, 0.88); backdrop-filter: blur(14px); align-items: center; justify-content: center; padding: 1.5rem;">
+    <div style="background: #0e131f; border: 1px solid var(--border-glow); border-radius: var(--radius-lg); width: 100%; max-width: 920px; overflow: hidden; box-shadow: 0 25px 60px rgba(0,0,0,0.85); display: flex; flex-direction: column;">
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.5rem; border-bottom: 1px solid var(--border-subtle); background: #07090e;">
+        <div style="display: flex; align-items: center; gap: 0.6rem;">
+          <span style="color: #ff0033; font-size: 1.1rem;">▶</span>
+          <h3 id="cinemaTitle" style="font-size: 1.1rem; font-weight: 700; color: #fff; max-width: 650px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">YouTube Stream</h3>
+        </div>
+        <button onclick="closeCinemaModal()" style="background: transparent; border: none; color: var(--text-muted); font-size: 1.75rem; cursor: pointer; padding: 0.1rem 0.5rem; line-height: 1;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='var(--text-muted)'">&times;</button>
+      </div>
+      <div style="position: relative; width: 100%; padding-top: 56.25%; background: #000;">
+        <iframe id="cinemaIframe" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none;" src="" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+      </div>
+      <div style="padding: 0.85rem 1.5rem; display: flex; justify-content: space-between; align-items: center; background: #07090e; border-top: 1px solid var(--border-subtle);">
+        <span style="font-size: 0.8rem; color: var(--text-muted);">Dangling Dice Studios™ &bull; Streaming on Site</span>
+        <button class="btn btn-secondary btn-sm" onclick="closeCinemaModal()">Close Player</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       Site Footer Section
+       ========================================================================== -->
+  <footer>
+    <div class="footer-links">
+      <a href="https://play.google.com/store/apps/details?id=com.danglingdicestudios.aicalculator" target="_blank" rel="noopener noreferrer" class="footer-link">
+        <span style="color: #00c9a7;">📱</span> Google Play: AI Calculator
+      </a>
+      <a href="https://www.youtube.com/@danglingdicestudios" target="_blank" rel="noopener noreferrer" class="footer-link">
+        <span style="color: #ff0033;">▶</span> YouTube: @danglingdicestudios
+      </a>
+      <a href="https://github.com/jacobyancey-bit" target="_blank" rel="noopener noreferrer" class="footer-link">
+        <span>💻</span> GitHub: @jacobyancey-bit
+      </a>
+      <a href="https://www.linkedin.com/in/jacob-yancey-085151372" target="_blank" rel="noopener noreferrer" class="footer-link">
+        <span style="color: #0a66c2;">💼</span> LinkedIn: Jacob Yancey
+      </a>
+    </div>
+    <p><strong>Dangling Dice Studios™</strong> &bull; Music Production, Coding Masterclasses, Phone Apps & Developer Tools &bull; Founded by Dangling Dice Studios™</p>
+  </footer>
+
+  <!-- Modular Client Logic -->
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>

@@ -5,7 +5,7 @@
 (function () {
   'use strict';
 
-  const VPN_API_BASE = 'https://danglingdicestudios.duckdns.org';
+  const VPN_API_BASE = window.location.origin;
 
   // 1. Session & UTM Attribution Engine
   function getOrSetSessionId() {

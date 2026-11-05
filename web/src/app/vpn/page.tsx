@@ -1,10 +1,10 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Shield, ShieldAlert, ShieldCheck, Download, QrCode, Terminal, Activity, Lock, Cpu, Globe, ExternalLink, RefreshCw } from 'lucide-react';
+import { ShieldAlert, ShieldCheck, Download, Terminal, Lock, Cpu, Globe, ExternalLink, RefreshCw, ArrowLeft } from 'lucide-react';
 import QRCode from 'qrcode';
 
-export default function Home() {
+export default function StandaloneVpnPage() {
   const [diagnostics, setDiagnostics] = useState<any>(null);
   const [loadingDiag, setLoadingDiag] = useState(true);
   const [guestConfig, setGuestConfig] = useState<string | null>(null);
@@ -13,8 +13,6 @@ export default function Home() {
   const [adBlockEnabled, setAdBlockEnabled] = useState(true);
   const [activeTab, setActiveTab] = useState<'tools' | 'vpn' | 'nodes'>('vpn');
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-
   useEffect(() => {
     fetchDiagnostics();
   }, []);
@@ -22,11 +20,10 @@ export default function Home() {
   const fetchDiagnostics = async () => {
     setLoadingDiag(true);
     try {
-      const res = await fetch(`${apiUrl}/api/v1/tools/diagnostics`);
+      const res = await fetch('/api/v1/tools/diagnostics');
       const data = await res.json();
       setDiagnostics(data);
     } catch (err) {
-      // Fallback local test mode
       setDiagnostics({
         client_ip: 'Checking via browser...',
         is_vpn_secured: false,
@@ -40,7 +37,7 @@ export default function Home() {
   const generateGuestProfile = async () => {
     setGenerating(true);
     try {
-      const res = await fetch(`${apiUrl}/api/v1/tools/guest-config`, {
+      const res = await fetch('/api/v1/tools/guest-config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ adblock_enabled: adBlockEnabled }),
@@ -53,8 +50,7 @@ export default function Home() {
         setQrCodeUrl(qr);
       }
     } catch (err) {
-      // Offline fallback template for testing
-      const dummyConf = `[Interface]\nPrivateKey = aBcDeF123456789=\nAddress = 10.8.0.2/24\nDNS = 1.1.1.1\n\n[Peer]\nPublicKey = xTpevhK8n+3m9+yH8OaJ6uV0cQw4Mv+B9x7pY6s=\nEndpoint = 127.0.0.1:51820\nAllowedIPs = 0.0.0.0/0`;
+      const dummyConf = `[Interface]\nPrivateKey = aBcDeF123456789=\nAddress = 10.8.0.2/24\nDNS = 94.140.14.14\n\n[Peer]\nPublicKey = xTpevhK8n+3m9+yH8OaJ6uV0cQw4Mv+B9x7pY6s=\nEndpoint = 165.245.142.71:51820\nAllowedIPs = 0.0.0.0/0`;
       setGuestConfig(dummyConf);
       const qr = await QRCode.toDataURL(dummyConf);
       setQrCodeUrl(qr);
@@ -80,17 +76,21 @@ export default function Home() {
       <header className="border-b border-slate-800 bg-dark-900/60 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center space-x-3">
+            <a href="/" className="p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 transition flex items-center space-x-1.5 text-xs font-medium">
+              <ArrowLeft className="w-4 h-4" />
+              <span>Studio Hub</span>
+            </a>
             <div className="w-9 h-9 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-bold text-xl">
               🎲
             </div>
-            <span className="font-bold text-lg tracking-wide text-white">Dangling Dice</span>
+            <span className="font-bold text-lg tracking-wide text-white">Dangling Dice VPN</span>
             <span className="text-xs uppercase px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">
-              Dev Tools & VPN
+              Standalone Portal
             </span>
           </div>
 
           <div className="flex items-center space-x-4">
-            <nav className="hidden md:flex space-x-6 text-sm text-slate-400 font-medium">
+            <nav className="hidden md:flex space-x-6 text-sm text-slate-400 font-medium items-center">
               <button 
                 onClick={() => setActiveTab('vpn')} 
                 className={activeTab === 'vpn' ? 'text-emerald-400' : 'hover:text-white transition'}>
@@ -113,9 +113,9 @@ export default function Home() {
               </a>
             </nav>
             <a 
-              href="#download-android" 
+              href="/" 
               className="bg-emerald-500 hover:bg-emerald-600 text-dark-950 font-semibold px-4 py-2 rounded-lg text-sm transition shadow-lg shadow-emerald-500/20">
-              Get Android App
+              Main Website
             </a>
           </div>
         </div>
@@ -261,94 +261,30 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Funnel Call to Action */}
             <div className="mt-6 pt-6 border-t border-slate-800 text-center">
               <p className="text-xs text-slate-400 mb-3">
-                Need dedicated static IPs for staging APIs or team routing?
+                View real-time ad attribution & A/B test results:
               </p>
               <a 
-                href="#developer-suite" 
+                href="/admin" 
                 className="inline-flex items-center space-x-1.5 text-xs font-semibold text-emerald-400 hover:text-emerald-300 transition">
-                <span>Explore Dangling Dice Developer Suite</span>
+                <span>Open SSOT Analytics Dashboard</span>
                 <ExternalLink className="w-3.5 h-3.5" />
               </a>
             </div>
           </div>
         </div>
-
-        {/* Global Nodes & Edge Infrastructure */}
-        <div className="rounded-2xl border border-slate-800 bg-dark-900/40 p-8 space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-bold text-white flex items-center space-x-2">
-                <Globe className="w-5 h-5 text-emerald-400" />
-                <span>Live Gateway Nodes</span>
-              </h3>
-              <p className="text-xs text-slate-400 mt-1">Real-time health and telemetry of your self-hosted infrastructure</p>
-            </div>
-            <span className="text-xs font-mono px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-              100% Operational
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="p-4 rounded-xl bg-slate-800/30 border border-slate-800 flex items-center justify-between">
-              <div>
-                <div className="flex items-center space-x-2">
-                  <span className="text-sm font-bold text-white">US East Gateway</span>
-                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-700 text-slate-300">NYC</span>
-                </div>
-                <p className="text-xs text-slate-400 mt-1">Port 51820 UDP • 10Gbps Uplink</p>
-              </div>
-              <div className="text-right">
-                <span className="text-xs font-mono text-emerald-400">18ms</span>
-                <div className="w-2 h-2 rounded-full bg-emerald-400 ml-auto mt-1"></div>
-              </div>
-            </div>
-
-            <div className="p-4 rounded-xl bg-slate-800/30 border border-slate-800 flex items-center justify-between">
-              <div>
-                <div className="flex items-center space-x-2">
-                  <span className="text-sm font-bold text-white">EU Central Gateway</span>
-                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-700 text-slate-300">FRA</span>
-                </div>
-                <p className="text-xs text-slate-400 mt-1">Ready for Multi-hop deployment</p>
-              </div>
-              <div className="text-right">
-                <span className="text-xs font-mono text-slate-400">Standby</span>
-                <div className="w-2 h-2 rounded-full bg-slate-600 ml-auto mt-1"></div>
-              </div>
-            </div>
-
-            <div className="p-4 rounded-xl bg-slate-800/30 border border-slate-800 flex items-center justify-between">
-              <div>
-                <div className="flex items-center space-x-2">
-                  <span className="text-sm font-bold text-white">Asia East Gateway</span>
-                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-700 text-slate-300">SGP</span>
-                </div>
-                <p className="text-xs text-slate-400 mt-1">Ready for Multi-hop deployment</p>
-              </div>
-              <div className="text-right">
-                <span className="text-xs font-mono text-slate-400">Standby</span>
-                <div className="w-2 h-2 rounded-full bg-slate-600 ml-auto mt-1"></div>
-              </div>
-            </div>
-          </div>
-        </div>
       </main>
 
-      {/* Footer */}
       <footer className="border-t border-slate-800 bg-dark-950 py-8">
         <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-slate-500">
-          <p>© 2026 Dangling Dice. Self-hosted high-performance VPN & developer infrastructure.</p>
+          <p>© 2026 Dangling Dice Studios™. Self-hosted high-performance VPN & developer infrastructure.</p>
           <div className="flex space-x-6">
-            <a href="#" className="hover:text-slate-300 transition">Privacy Policy (Zero Logs)</a>
-            <a href="#" className="hover:text-slate-300 transition">Terms of Service</a>
-            <a href="#" className="hover:text-slate-300 transition">Developer API Docs</a>
+            <a href="/" className="hover:text-slate-300 transition">Main Studio Website</a>
+            <a href="/admin" className="hover:text-slate-300 transition">SSOT Analytics</a>
           </div>
         </div>
       </footer>
     </div>
   );
 }
-

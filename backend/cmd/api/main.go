@@ -93,6 +93,9 @@ func main() {
 
 	// API Routes
 	r.Get("/health", state.handleHealth)
+	r.Get("/api", state.handleStudioApiRoot)
+	r.Get("/api/", state.handleStudioApiRoot)
+	r.Get("/api/items", state.handleStudioCatalogItems)
 	
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Get("/servers", state.handleListServers)
@@ -121,6 +124,119 @@ func (s *ServerState) handleHealth(w http.ResponseWriter, r *http.Request) {
 		"timestamp":   time.Now().UTC(),
 		"public_ip":   s.cfg.ServerPublicIP,
 		"wireguard":   s.cfg.WGInterface,
+	})
+}
+
+// Handler: Studio Website API Healthcheck (/api/)
+func (s *ServerState) handleStudioApiRoot(w http.ResponseWriter, r *http.Request) {
+	jsonResponse(w, http.StatusOK, map[string]interface{}{
+		"success":       true,
+		"service":       "Dangling Dice Studios™ REST API & VPN Control Plane",
+		"version":       "1.0.0",
+		"documentation": "/api",
+	})
+}
+
+// Handler: Studio Website Catalog Items (/api/items)
+func (s *ServerState) handleStudioCatalogItems(w http.ResponseWriter, r *http.Request) {
+	items := []map[string]interface{}{
+		{
+			"_id":         "item-1",
+			"title":       "Dangling Dice Secure Dev VPN & Proxy",
+			"description": "High-speed, encrypted WireGuard VPN built specifically for developers. Geolocation testing, static IP whitelisting, ad/malware DNS sinkholing, and privacy protection.",
+			"category":    "Developer Tools",
+			"mediaUrl":    "/vpn",
+			"imageUrl":    "/images/logo.png",
+			"tags":        []string{"VPN", "WireGuard", "Privacy", "Android", "DevTools"},
+			"price":       0,
+			"isFeatured":  true,
+			"isTool":      true,
+			"toolType":    "standalone-app",
+			"liveUrl":     "/vpn",
+		},
+		{
+			"_id":         "item-2",
+			"title":       "MongoDB Connection URI & Query Inspector",
+			"description": "Interactive client-side developer utility. Validates SRV connection strings, encodes credentials, highlights syntax errors, and generates clean .env environment variable configs.",
+			"category":    "Developer Tools",
+			"mediaUrl":    "#mongoInspector",
+			"imageUrl":    "/images/logo.png",
+			"tags":        []string{"MongoDB", "DevTools", "Database", "Utility"},
+			"price":       0,
+			"isFeatured":  true,
+			"isTool":      true,
+			"toolType":    "web-utility",
+			"liveUrl":     "#mongoInspector",
+		},
+		{
+			"_id":         "item-3",
+			"title":       "AI Calculator — Smart Android Mathematical Assistant",
+			"description": "Next-generation Android calculator powered by artificial intelligence. Solves complex algebra, calculus, step-by-step homework problems, and visualizes mathematical graphs. Available on Google Play Store.",
+			"category":    "Mobile Apps",
+			"mediaUrl":    "https://play.google.com/store/apps/details?id=com.danglingdicestudios.aicalculator",
+			"imageUrl":    "/images/ai_calculator.png",
+			"tags":        []string{"Android", "AI", "Google Play", "Calculator", "Mobile App"},
+			"price":       0,
+			"isFeatured":  true,
+		},
+		{
+			"_id":         "item-4",
+			"title":       "Building Modern Full-Stack Applications from Scratch",
+			"description": "Comprehensive video course showing beginners and developers how to scaffold clean three-tier architecture with Node, Express, MongoDB, Go, and modern decoupled clients.",
+			"category":    "Coding Tutorials",
+			"mediaUrl":    "https://www.youtube.com/@danglingdicestudios",
+			"imageUrl":    "/images/banner.jpg",
+			"tags":        []string{"JavaScript", "Node.js", "MongoDB", "Architecture", "Web Dev"},
+			"price":       0,
+			"isFeatured":  true,
+		},
+		{
+			"_id":         "item-5",
+			"title":       "Neon D20 — Cyberpunk Lofi Instrumental EP",
+			"description": "Atmospheric beat collection crafted for late-night coding sessions, studying, and focus. Produced by Dangling Beats Studio.",
+			"category":    "Beats & Audio",
+			"mediaUrl":    "https://www.youtube.com/@danglingdicestudios",
+			"imageUrl":    "/images/banner.jpg",
+			"tags":        []string{"Lofi", "Beats", "Cyberpunk", "Study Music", "Coding Beats"},
+			"price":       0,
+			"isFeatured":  true,
+		},
+		{
+			"_id":               "item-6",
+			"title":             "DigitalOcean — Cloud Compute & Dedicated Droplets",
+			"description":       "Developer-friendly cloud computing, scalable VPS droplets, managed Kubernetes, and databases. Simple pricing with zero hidden egress fees.",
+			"category":          "Developer Tools",
+			"mediaUrl":          "https://www.digitalocean.com",
+			"imageUrl":          "/images/logo.png",
+			"tags":              []string{"Cloud", "VPS", "Hosting", "Droplets", "Recommended"},
+			"price":             0,
+			"isFeatured":        true,
+			"isAffiliate":       true,
+			"affiliateCategory": "Cloud Hosting & Databases",
+			"affiliateBadge":    "Partner Deal • $200 Free 60-Day Credit",
+			"affiliateUrl":      "https://www.digitalocean.com",
+		},
+		{
+			"_id":               "item-7",
+			"title":             "MongoDB Atlas — Multi-Cloud Managed Database",
+			"description":       "Deploy fully managed MongoDB clusters across AWS, Google Cloud, and Azure. Free shared cluster tier with automated backups, monitoring, and seamless scaling.",
+			"category":          "Developer Tools",
+			"mediaUrl":          "https://www.mongodb.com/cloud/atlas/register",
+			"imageUrl":          "/images/logo.png",
+			"tags":              []string{"MongoDB", "Atlas", "Cloud Database", "Recommended"},
+			"price":             0,
+			"isFeatured":        true,
+			"isAffiliate":       true,
+			"affiliateCategory": "Cloud Hosting & Databases",
+			"affiliateBadge":    "Official Cloud Partner • Free Tier Available",
+			"affiliateUrl":      "https://www.mongodb.com/cloud/atlas/register",
+		},
+	}
+
+	jsonResponse(w, http.StatusOK, map[string]interface{}{
+		"success": true,
+		"count":   len(items),
+		"data":    items,
 	})
 }
 
