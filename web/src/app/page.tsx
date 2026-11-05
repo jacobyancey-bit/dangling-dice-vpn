@@ -113,7 +113,7 @@ export default function StandaloneVpnPage() {
               </a>
             </nav>
             <a 
-              href="https://danglingdicestudios.duckdns.org" 
+              href="https://dangling-dice-studios.com" 
               className="bg-emerald-500 hover:bg-emerald-600 text-dark-950 font-semibold px-4 py-2 rounded-lg text-sm transition shadow-lg shadow-emerald-500/20">
               Main Studio Hub ↗
             </a>
@@ -280,7 +280,7 @@ export default function StandaloneVpnPage() {
         <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-slate-500">
           <p>© 2026 Dangling Dice Studios™. Self-hosted high-performance VPN & developer infrastructure.</p>
           <div className="flex space-x-6">
-            <a href="https://danglingdicestudios.duckdns.org" className="hover:text-slate-300 transition">Main Studio Website</a>
+            <a href="https://dangling-dice-studios.com" className="hover:text-slate-300 transition">Main Studio Website</a>
             <a href="/privacy" className="hover:text-slate-300 transition">Privacy Policy & VpnService Disclosure</a>
             <a href="/admin" className="hover:text-slate-300 transition">SSOT Analytics</a>
           </div>

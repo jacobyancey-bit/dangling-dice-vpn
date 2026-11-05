@@ -437,7 +437,7 @@ fun MainAppScaffold(
                         TextButton(
                             onClick = {
                                 showPrivacyDialog = false
-                                uriHandler.openUri("https://vpn.danglingdicestudios.duckdns.org/privacy")
+                                uriHandler.openUri("https://vpn.dangling-dice-studios.com/privacy")
                             }
                         ) {
                             Text("Privacy Policy ↗", color = Emerald500)

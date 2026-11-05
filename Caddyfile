@@ -4,10 +4,10 @@
 }
 
 # ==============================================================================
-# 1. Main Studio Website Domain (https://danglingdicestudios.duckdns.org)
+# 1. Main Studio Website Domain (https://dangling-dice-studios.com)
 #    Isolated Container: dangling-studio (studio:80)
 # ==============================================================================
-danglingdicestudios.duckdns.org {
+dangling-dice-studios.com, www.dangling-dice-studios.com, danglingdicestudios.duckdns.org {
     encode zstd gzip
 
     header {
@@ -46,10 +46,10 @@ danglingdicestudios.duckdns.org {
 }
 
 # ==============================================================================
-# 2. Standalone VPN & SSOT Telemetry Subdomain (https://vpn.danglingdicestudios.duckdns.org)
+# 2. Standalone VPN & SSOT Telemetry Subdomain (https://vpn.dangling-dice-studios.com)
 #    Isolated Container: dangling-web (web:3000)
 # ==============================================================================
-vpn.danglingdicestudios.duckdns.org {
+vpn.dangling-dice-studios.com, vpn.danglingdicestudios.duckdns.org {
     encode zstd gzip
 
     header {

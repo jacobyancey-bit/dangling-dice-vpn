@@ -85,7 +85,7 @@ export default function PrivacyPolicyPage() {
               <span>4. Contact &amp; Data Deletion Requests</span>
             </h3>
             <p className="text-sm text-slate-400 leading-relaxed">
-              Because Dangling Dice VPN uses anonymous Zero-Login cryptographic keys, you can reset your identity at any time by clearing the app storage or uninstalling the application on your Android device. For questions regarding privacy or security, contact <strong>Dangling Dice Studios™</strong> via our official hub at <a href="https://danglingdicestudios.duckdns.org" className="text-emerald-400 underline">danglingdicestudios.duckdns.org</a>.
+              Because Dangling Dice VPN uses anonymous Zero-Login cryptographic keys, you can reset your identity at any time by clearing the app storage or uninstalling the application on your Android device. For questions regarding privacy or security, contact <strong>Dangling Dice Studios™</strong> via our official hub at <a href="https://dangling-dice-studios.com" className="text-emerald-400 underline">dangling-dice-studios.com</a>.
             </p>
           </div>
         </section>

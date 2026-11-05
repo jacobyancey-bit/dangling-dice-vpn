@@ -17,6 +17,8 @@ import kotlin.math.roundToInt
 
 class DanglingApiClient(
     private val baseUrls: List<String> = listOf(
+        "https://vpn.dangling-dice-studios.com",
+        "https://dangling-dice-studios.com",
         "https://vpn.danglingdicestudios.duckdns.org",
         "https://danglingdicestudios.duckdns.org",
         "http://165.245.142.71"
