@@ -92,10 +92,20 @@ Test-Breakpoint "Breakpoint 5: WireGuard UDP Socket Reachability" {
     try {
         $udpClient.Connect($ServerIP, 51820)
         # WireGuard responds only to valid crypto handshakes, but connection socket should bind cleanly
-        return @{ Success = $true; Message = "UDP socket successfully routed to $ServerIP:51820" }
+        return @{ Success = $true; Message = "UDP socket successfully routed to $ServerIP`:51820" }
     } finally {
         $udpClient.Close()
     }
+}
+
+# Breakpoint 6: SSOT Telemetry & A/B Testing Engine
+Test-Breakpoint "Breakpoint 6: SSOT Telemetry & A/B Experiment API" {
+    $url = "http://$ServerIP/api/v1/experiments/variant?session_id=diagnostic_test_01"
+    $response = Invoke-RestMethod -Uri $url -TimeoutSec 5 -ErrorAction Stop
+    if ($response.variant_assigned) {
+        return @{ Success = $true; Message = "Experiment: $($response.experiment_key) | Assigned Variant: $($response.variant_assigned)" }
+    }
+    return @{ Success = $false; Message = "Failed to evaluate A/B experiment variant." }
 }
 
 Write-Host "`n==========================================================" -ForegroundColor Cyan
