@@ -3,7 +3,10 @@
     admin off
 }
 
-# 1. Production HTTPS Domain (Automatic Let's Encrypt SSL/TLS & HTTP/3 QUIC)
+# ==============================================================================
+# 1. Main Studio Website Domain (https://danglingdicestudios.duckdns.org)
+#    Isolated Container: dangling-studio (studio:80)
+# ==============================================================================
 danglingdicestudios.duckdns.org {
     encode zstd gzip
 
@@ -16,7 +19,7 @@ danglingdicestudios.duckdns.org {
         Access-Control-Allow-Headers "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization"
     }
 
-    # Route /api/* (both Studio Catalog /api/items and VPN /api/v1/*) to Go API
+    # Route /api/* (Studio Catalog /api/items and VPN /api/v1/*) to Go API
     handle /api* {
         reverse_proxy api:8080 {
             header_up Host {host}
@@ -26,7 +29,6 @@ danglingdicestudios.duckdns.org {
         }
     }
 
-    # Route /health to API
     handle /health {
         reverse_proxy api:8080 {
             header_up Host {host}
@@ -34,12 +36,50 @@ danglingdicestudios.duckdns.org {
         }
     }
 
-    # Root '/' serves the Main Dangling Dice Studios™ Website (studio.html)
-    # '/vpn' serves the Standalone Next.js VPN Portal
-    # '/admin' serves the SSOT Analytics & A/B Testing Dashboard
+    # Route all website pages/assets to the isolated Studio Website Container
     handle {
-        @root path /
-        rewrite @root /studio.html
+        reverse_proxy studio:80 {
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+        }
+    }
+}
+
+# ==============================================================================
+# 2. Standalone VPN & SSOT Telemetry Subdomain (https://vpn.danglingdicestudios.duckdns.org)
+#    Isolated Container: dangling-web (web:3000)
+# ==============================================================================
+vpn.danglingdicestudios.duckdns.org {
+    encode zstd gzip
+
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Access-Control-Allow-Origin "*"
+        Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+        Access-Control-Allow-Headers "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization"
+    }
+
+    # Route /api/* to Go API
+    handle /api* {
+        reverse_proxy api:8080 {
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+
+    handle /health {
+        reverse_proxy api:8080 {
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+        }
+    }
+
+    # Route all requests (/ and /admin and /vpn-widget.js) to the isolated VPN Container
+    handle {
         reverse_proxy web:3000 {
             header_up Host {host}
             header_up X-Real-IP {remote_host}
@@ -47,7 +87,9 @@ danglingdicestudios.duckdns.org {
     }
 }
 
-# 2. Direct IP & Localhost Access (For immediate IP diagnostics & local healthchecks)
+# ==============================================================================
+# 3. Direct IP & Localhost Access (For IP diagnostics & local healthchecks)
+# ==============================================================================
 http://165.245.142.71, http://localhost {
     encode zstd gzip
 
@@ -74,9 +116,7 @@ http://165.245.142.71, http://localhost {
     }
 
     handle {
-        @root path /
-        rewrite @root /studio.html
-        reverse_proxy web:3000 {
+        reverse_proxy studio:80 {
             header_up Host {host}
             header_up X-Real-IP {remote_host}
         }

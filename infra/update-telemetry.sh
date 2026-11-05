@@ -9,8 +9,8 @@ cd /root/dangling-dice
 echo ">>> 1. Applying Telemetry & A/B Testing Database Schema..."
 docker exec -i dangling-postgres psql -U dangling_user -d dangling_dice_db < backend/migrations/002_telemetry.sql
 
-echo ">>> 2. Rebuilding & Restarting API, Web (Studio + VPN), and Caddy..."
-docker compose up -d --build api web
+echo ">>> 2. Rebuilding & Starting Isolated Containers (studio, web, api) and Caddy..."
+docker compose up -d --build api web studio
 docker compose restart caddy
 
 echo ">>> 3. Verifying All Endpoints (Studio Website, Catalog API, VPN API & SSOT Telemetry)..."
@@ -25,8 +25,8 @@ echo -n "SSOT Experiment (/api/v1/experiments/variant): "
 curl -s "http://localhost/api/v1/experiments/variant?session_id=diagnostic_test_01"
 echo ""
 echo "=========================================================="
-echo " DEPLOYMENT LIVE!"
+echo " DEPLOYMENT LIVE! (ISOLATED SUBDOMAIN CONTAINERS)"
 echo " Main Studio Website: https://danglingdicestudios.duckdns.org"
-echo " Standalone VPN App:  https://danglingdicestudios.duckdns.org/vpn"
-echo " SSOT Analytics:      https://danglingdicestudios.duckdns.org/admin"
+echo " Standalone VPN App:  https://vpn.danglingdicestudios.duckdns.org"
+echo " SSOT Analytics:      https://vpn.danglingdicestudios.duckdns.org/admin"
 echo "=========================================================="

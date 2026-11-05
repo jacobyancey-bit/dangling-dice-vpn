@@ -113,9 +113,9 @@ export default function StandaloneVpnPage() {
               </a>
             </nav>
             <a 
-              href="/" 
+              href="https://danglingdicestudios.duckdns.org" 
               className="bg-emerald-500 hover:bg-emerald-600 text-dark-950 font-semibold px-4 py-2 rounded-lg text-sm transition shadow-lg shadow-emerald-500/20">
-              Main Website
+              Main Studio Hub ↗
             </a>
           </div>
         </div>
@@ -288,3 +288,4 @@ export default function StandaloneVpnPage() {
     </div>
   );
 }
+

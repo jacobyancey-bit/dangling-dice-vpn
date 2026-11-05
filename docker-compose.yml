@@ -28,6 +28,20 @@ services:
         condition: service_started
       web:
         condition: service_started
+      studio:
+        condition: service_started
+
+  # ============================================================================
+  # 1b. Main Dangling Dice Studios™ Website Container (danglingdicestudios.duckdns.org)
+  # ============================================================================
+  studio:
+    build:
+      context: ./studio
+      dockerfile: Dockerfile
+    container_name: dangling-studio
+    restart: unless-stopped
+    networks:
+      - public-net
 
   # ============================================================================
   # 2. Control Plane & Developer API (Go Backend)
