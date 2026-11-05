@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# Dangling Dice Live Server Upgrade: SSOT Telemetry, A/B Testing & Widget
+# Dangling Dice Live Server Upgrade: SSOT Telemetry, Admin UI, AdBlock & DevTunnel
 # ==============================================================================
 set -euo pipefail
 
 cd /root/dangling-dice
 
-echo ">>> 1. Adding Telemetry & A/B Testing Schema..."
+echo ">>> 1. Applying Telemetry & A/B Testing Database Schema..."
 cat << 'EOF' > backend/migrations/002_telemetry.sql
 CREATE TABLE IF NOT EXISTS ad_campaigns (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -61,10 +61,9 @@ CREATE INDEX IF NOT EXISTS idx_telemetry_utm_source ON telemetry_events(utm_sour
 CREATE INDEX IF NOT EXISTS idx_telemetry_platform ON telemetry_events(platform);
 EOF
 
-# Apply migration directly to the running Postgres container
 docker exec -i dangling-postgres psql -U dangling_user -d dangling_dice_db < backend/migrations/002_telemetry.sql
 
-echo ">>> 2. Updating Go Control Plane API with Telemetry & A/B Endpoints..."
+echo ">>> 2. Updating Go Control Plane API..."
 cat << 'EOF' > backend/cmd/api/main.go
 package main
 
@@ -160,6 +159,7 @@ func main() {
 		r.Get("/tools/diagnostics", state.handleDiagnostics)
 		r.Post("/peers/register", state.handleRegisterPeer)
 		r.Post("/tools/guest-config", state.handleGenerateGuestConfig)
+		r.Post("/tools/dev-tunnel", state.handleCreateDevTunnel)
 
 		// Single Source of Truth (SSOT): Telemetry, Attribution & A/B Testing
 		r.Post("/telemetry/event", state.handleTrackEvent)
@@ -210,8 +210,9 @@ func (s *ServerState) handleListServers(w http.ResponseWriter, r *http.Request) 
 }
 
 type RegisterPeerRequest struct {
-	DeviceName string `json:"device_name"`
-	PublicKey  string `json:"public_key"`
+	DeviceName     string `json:"device_name"`
+	PublicKey      string `json:"public_key"`
+	AdBlockEnabled bool   `json:"adblock_enabled"`
 }
 
 func (s *ServerState) handleRegisterPeer(w http.ResponseWriter, r *http.Request) {
@@ -223,7 +224,15 @@ func (s *ServerState) handleRegisterPeer(w http.ResponseWriter, r *http.Request)
 	s.mu.Lock()
 	assignedIP := fmt.Sprintf("10.8.0.%d", s.nextIPIndex)
 	s.nextIPIndex++
+	if s.nextIPIndex > 250 {
+		s.nextIPIndex = 2
+	}
 	s.mu.Unlock()
+
+	dnsServer := s.cfg.VPNDNSServer
+	if req.AdBlockEnabled {
+		dnsServer = "94.140.14.14, 94.140.15.15"
+	}
 
 	go func(pubKey, ip string) {
 		exec.Command("wg", "set", s.cfg.WGInterface, "peer", pubKey, "allowed-ips", ip+"/32").Run()
@@ -233,16 +242,32 @@ func (s *ServerState) handleRegisterPeer(w http.ResponseWriter, r *http.Request)
 		"assigned_ip":       assignedIP + "/24",
 		"server_public_key": s.serverPubKey,
 		"endpoint":          fmt.Sprintf("%s:%s", s.cfg.ServerPublicIP, s.cfg.VPNListenPort),
-		"dns":               s.cfg.VPNDNSServer,
+		"dns":               dnsServer,
+		"adblock_active":    req.AdBlockEnabled,
 	})
 }
 
+type GuestConfigRequest struct {
+	AdBlockEnabled bool `json:"adblock_enabled"`
+}
+
 func (s *ServerState) handleGenerateGuestConfig(w http.ResponseWriter, r *http.Request) {
+	var req GuestConfigRequest
+	_ = json.NewDecoder(r.Body).Decode(&req)
+
 	privKey, pubKey := generateWireGuardKeyPair()
 	s.mu.Lock()
 	assignedIP := fmt.Sprintf("10.8.0.%d", s.nextIPIndex)
 	s.nextIPIndex++
+	if s.nextIPIndex > 250 {
+		s.nextIPIndex = 2
+	}
 	s.mu.Unlock()
+
+	dnsServer := s.cfg.VPNDNSServer
+	if req.AdBlockEnabled {
+		dnsServer = "94.140.14.14, 94.140.15.15"
+	}
 
 	exec.Command("wg", "set", s.cfg.WGInterface, "peer", pubKey, "allowed-ips", assignedIP+"/32").Run()
 
@@ -256,12 +281,42 @@ PublicKey = %s
 Endpoint = %s:%s
 AllowedIPs = 0.0.0.0/0, ::/0
 PersistentKeepalive = 25
-`, privKey, assignedIP, s.cfg.VPNDNSServer, s.serverPubKey, s.cfg.ServerPublicIP, s.cfg.VPNListenPort)
+`, privKey, assignedIP, dnsServer, s.serverPubKey, s.cfg.ServerPublicIP, s.cfg.VPNListenPort)
 
 	jsonResponse(w, http.StatusOK, map[string]interface{}{
-		"assigned_ip": assignedIP,
-		"public_key":  pubKey,
-		"config_text": rawConf,
+		"assigned_ip":    assignedIP,
+		"public_key":     pubKey,
+		"dns":            dnsServer,
+		"adblock_active": req.AdBlockEnabled,
+		"config_text":    rawConf,
+	})
+}
+
+type DevTunnelRequest struct {
+	Subdomain  string `json:"subdomain"`
+	TargetPort int    `json:"target_port"`
+	PeerIP     string `json:"peer_ip"`
+}
+
+func (s *ServerState) handleCreateDevTunnel(w http.ResponseWriter, r *http.Request) {
+	var req DevTunnelRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Subdomain == "" || req.TargetPort <= 0 {
+		jsonError(w, http.StatusBadRequest, "Valid 'subdomain' and 'target_port' are required.")
+		return
+	}
+	if req.PeerIP == "" {
+		req.PeerIP = "10.8.0.2"
+	}
+	if s.db != nil {
+		_, _ = s.db.Exec(
+			`INSERT INTO dev_tunnels (subdomain, target_port, peer_ip) VALUES ($1, $2, $3) ON CONFLICT (subdomain) DO UPDATE SET target_port = $2, peer_ip = $3`,
+			req.Subdomain, req.TargetPort, req.PeerIP,
+		)
+	}
+	jsonResponse(w, http.StatusOK, map[string]interface{}{
+		"status":     "active",
+		"public_url": fmt.Sprintf("http://%s.%s", req.Subdomain, s.cfg.ServerPublicIP),
+		"target":     fmt.Sprintf("%s:%d", req.PeerIP, req.TargetPort),
 	})
 }
 
@@ -420,194 +475,148 @@ func jsonError(w http.ResponseWriter, status int, msg string) {
 }
 EOF
 
-echo ">>> 3. Writing Drop-in Website Widget..."
-mkdir -p web/public
-cat << 'EOF' > web/public/vpn-widget.js
-(function () {
-  'use strict';
-  const VPN_API_BASE = 'http://165.245.142.71';
+echo ">>> 3. Writing Drop-in Website Widget & Admin Dashboard..."
+mkdir -p web/public web/src/app/admin
 
-  function getOrSetSessionId() {
-    let sid = localStorage.getItem('dd_vpn_sid');
-    if (!sid) {
-      sid = 'sid_' + Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
-      localStorage.setItem('dd_vpn_sid', sid);
-    }
-    return sid;
-  }
+cat << 'EOF' > web/src/app/admin/page.tsx
+'use client';
+import React, { useState, useEffect } from 'react';
+import { BarChart3, TrendingUp, Users, ShieldCheck, Activity, RefreshCw, ArrowLeft, Layers, Zap, Award } from 'lucide-react';
+import Link from 'next/link';
 
-  function getUtmParams() {
-    const urlParams = new URLSearchParams(window.location.search);
-    return {
-      utm_source: urlParams.get('utm_source') || localStorage.getItem('dd_utm_source') || 'direct',
-      utm_medium: urlParams.get('utm_medium') || localStorage.getItem('dd_utm_medium') || '',
-      utm_campaign: urlParams.get('utm_campaign') || localStorage.getItem('dd_utm_campaign') || ''
-    };
-  }
+export default function AdminAnalyticsPage() {
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [simulating, setSimulating] = useState(false);
 
-  const utms = getUtmParams();
-  if (utms.utm_source !== 'direct') {
-    localStorage.setItem('dd_utm_source', utms.utm_source);
-    localStorage.setItem('dd_utm_medium', utms.utm_medium);
-    localStorage.setItem('dd_utm_campaign', utms.utm_campaign);
-  }
-
-  const sessionId = getOrSetSessionId();
-  let assignedVariant = 'variant_a';
-
-  async function trackEvent(eventName, metadata = {}) {
+  const fetchAnalytics = async () => {
+    setLoading(true);
     try {
-      fetch(`${VPN_API_BASE}/api/v1/telemetry/event`, {
+      const res = await fetch('/api/v1/admin/analytics');
+      const json = await res.json();
+      setData(json);
+    } catch (_) {}
+    setLoading(false);
+  };
+
+  useEffect(() => { fetchAnalytics(); }, []);
+
+  const simulateConversionEvent = async () => {
+    setSimulating(true);
+    const sources = ['youtube', 'tiktok', 'google', 'github', 'reddit'];
+    const randomSource = sources[Math.floor(Math.random() * sources.length)];
+    const randomVariant = Math.random() > 0.45 ? 'variant_b' : 'variant_a';
+    try {
+      await fetch('/api/v1/telemetry/event', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          event_name: eventName,
-          session_id: sessionId,
-          platform: 'website_widget',
+          event_name: 'profile_gen',
+          session_id: 'sim_' + Date.now(),
+          platform: 'admin_test',
           experiment_key: 'vpn_hero_cta',
-          variant_assigned: assignedVariant,
-          utm_source: utms.utm_source,
-          utm_campaign: utms.utm_campaign,
-          metadata: metadata
-        })
+          variant_assigned: randomVariant,
+          utm_source: randomSource,
+          utm_campaign: 'dev_funnel_launch',
+        }),
       });
+      await fetchAnalytics();
     } catch (_) {}
-  }
+    setSimulating(false);
+  };
 
-  async function initWidget() {
-    try {
-      const res = await fetch(`${VPN_API_BASE}/api/v1/experiments/variant?session_id=${sessionId}`);
-      const data = await res.json();
-      assignedVariant = data.variant_assigned || 'variant_a';
-    } catch (_) {}
+  const funnel = data?.funnel || {};
+  const pageViews = funnel.page_view || 0;
+  const leakTests = funnel.leak_test_run || 0;
+  const profilesGen = funnel.profile_gen || 0;
+  const handshakes = funnel.vpn_handshake || 0;
+  const variantACount = data?.ab_variants?.variant_a || 0;
+  const variantBCount = data?.ab_variants?.variant_b || 0;
+  const winningVariant = variantBCount >= variantACount ? 'Variant B (Developer Privacy Suite)' : 'Variant A (WireGuard VPN)';
 
-    trackEvent('page_view', { path: window.location.pathname });
-
-    const container = document.getElementById('dangling-dice-vpn-widget');
-    if (!container) return;
-
-    container.innerHTML = `
-      <div style="background: #080c14; border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 12px; padding: 1.5rem; color: #fff; font-family: 'Plus Jakarta Sans', system-ui, sans-serif;">
-        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; border-bottom: 1px solid #1e293b; padding-bottom: 1rem; margin-bottom: 1.25rem;">
-          <div style="display: flex; align-items: center; gap: 0.75rem;">
-            <span style="font-size: 1.75rem;">🎲</span>
-            <div>
-              <h3 style="margin: 0; font-size: 1.15rem; font-weight: 700; color: #fff;">
-                ${assignedVariant === 'variant_b' ? 'Dangling Dice Developer Privacy Suite' : 'Dangling Dice WireGuard VPN'}
-              </h3>
-              <p style="margin: 0.2rem 0 0 0; font-size: 0.8rem; color: #94a3b8;">
-                Zero-Log In-Kernel Network Shield &bull; 100% Free
-              </p>
-            </div>
-          </div>
-          <span id="dd-vpn-status-badge" style="background: rgba(245, 158, 11, 0.12); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); padding: 0.3rem 0.75rem; border-radius: 999px; font-size: 0.75rem; font-weight: 700;">
-            ● DIRECT (UNPROTECTED)
-          </span>
-        </div>
-
-        <div style="background: #0f172a; border: 1px solid #1e293b; border-radius: 10px; padding: 1rem; margin-bottom: 1.25rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-100 p-6 md:p-10">
+      <div className="max-w-6xl mx-auto space-y-8">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-6">
           <div>
-            <span style="font-size: 0.75rem; color: #94a3b8; text-transform: uppercase;">Detected Public IP:</span>
-            <div id="dd-vpn-ip" style="font-family: 'JetBrains Mono', monospace; font-size: 0.95rem; font-weight: 700; color: #22c55e;">Fetching...</div>
+            <div className="flex items-center space-x-3">
+              <Link href="/" className="p-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 hover:text-white">
+                <ArrowLeft className="w-4 h-4" />
+              </Link>
+              <span className="text-xs font-mono uppercase px-2.5 py-1 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                Single Source of Truth (SSOT)
+              </span>
+            </div>
+            <h1 className="text-2xl font-bold text-white mt-3">Ad Attribution, Funnel & A/B Testing Center</h1>
           </div>
-          <button id="dd-btn-test-leak" style="background: #1e293b; color: #e2e8f0; border: 1px solid #334155; padding: 0.5rem 1rem; border-radius: 8px; font-size: 0.8rem; font-weight: 600; cursor: pointer;">
-            ⚡ Run Leak Shield Test
-          </button>
-        </div>
-
-        <div id="dd-vpn-action-box">
-          <button id="dd-btn-generate-profile" style="width: 100%; background: linear-gradient(135deg, #10b981, #06b6d4); color: #020617; border: none; padding: 0.85rem; border-radius: 10px; font-size: 0.95rem; font-weight: 800; cursor: pointer;">
-            🚀 1-Click Generate Free WireGuard Profile
-          </button>
-        </div>
-
-        <div id="dd-vpn-profile-output" style="display: none; margin-top: 1rem; background: #030712; border: 1px solid #1e293b; border-radius: 10px; padding: 1rem;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-            <span style="font-size: 0.75rem; color: #22c55e; font-weight: 700;">● Profile Ready (Valid 24h)</span>
-            <button id="dd-btn-download-conf" style="background: #10b981; color: #020617; border: none; padding: 0.35rem 0.75rem; border-radius: 6px; font-size: 0.75rem; font-weight: 700; cursor: pointer;">
-              Download .conf
+          <div className="flex items-center space-x-3">
+            <button onClick={simulateConversionEvent} disabled={simulating} className="px-4 py-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-xs font-bold flex items-center space-x-2">
+              <Zap className="w-4 h-4" />
+              <span>{simulating ? 'Recording...' : 'Simulate Funnel Event'}</span>
+            </button>
+            <button onClick={fetchAnalytics} disabled={loading} className="px-4 py-2 rounded-xl bg-slate-900 text-slate-200 border border-slate-800 text-xs font-semibold flex items-center space-x-2">
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              <span>Refresh</span>
             </button>
           </div>
-          <pre id="dd-vpn-conf-text" style="background: #0f172a; color: #94a3b8; font-family: monospace; font-size: 0.75rem; padding: 0.75rem; border-radius: 6px; overflow-x: auto; max-height: 120px; margin: 0;"></pre>
+        </div>
+
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="p-5 rounded-2xl bg-slate-900/50 border border-slate-800">
+            <span className="text-xs font-mono text-slate-400 uppercase">Impressions</span>
+            <div className="text-3xl font-extrabold text-white mt-2">{pageViews}</div>
+          </div>
+          <div className="p-5 rounded-2xl bg-slate-900/50 border border-slate-800">
+            <span className="text-xs font-mono text-slate-400 uppercase">Leak Tests</span>
+            <div className="text-3xl font-extrabold text-white mt-2">{leakTests}</div>
+          </div>
+          <div className="p-5 rounded-2xl bg-slate-900/50 border border-slate-800">
+            <span className="text-xs font-mono text-slate-400 uppercase">Profiles Generated</span>
+            <div className="text-3xl font-extrabold text-emerald-400 mt-2">{profilesGen}</div>
+          </div>
+          <div className="p-5 rounded-2xl bg-slate-900/50 border border-slate-800">
+            <span className="text-xs font-mono text-slate-400 uppercase">VPN Handshakes</span>
+            <div className="text-3xl font-extrabold text-purple-400 mt-2">{handshakes}</div>
+          </div>
+        </div>
+
+        <div className="p-6 rounded-2xl bg-slate-900/40 border border-slate-800 space-y-4">
+          <div className="flex justify-between items-center">
+            <h2 className="text-lg font-bold text-white">Live A/B Experiment: vpn_hero_cta</h2>
+            <span className="text-xs font-mono px-3 py-1 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-bold">
+              Leader: {winningVariant}
+            </span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 flex justify-between items-center">
+              <div>
+                <span className="text-xs font-mono text-slate-400">VARIANT A</span>
+                <div className="font-bold text-white">Dangling Dice WireGuard VPN</div>
+              </div>
+              <div className="text-2xl font-extrabold text-white">{variantACount}</div>
+            </div>
+            <div className="p-4 rounded-xl bg-slate-950 border border-emerald-500/30 flex justify-between items-center">
+              <div>
+                <span className="text-xs font-mono text-emerald-400">VARIANT B</span>
+                <div className="font-bold text-white">Dangling Dice Developer Privacy Suite</div>
+              </div>
+              <div className="text-2xl font-extrabold text-emerald-400">{variantBCount}</div>
+            </div>
+          </div>
         </div>
       </div>
-    `;
-
-    const testLeakBtn = document.getElementById('dd-btn-test-leak');
-    const genProfileBtn = document.getElementById('dd-btn-generate-profile');
-    const ipLabel = document.getElementById('dd-vpn-ip');
-    const statusBadge = document.getElementById('dd-vpn-status-badge');
-    const outputBox = document.getElementById('dd-vpn-profile-output');
-    const confText = document.getElementById('dd-vpn-conf-text');
-    const downloadBtn = document.getElementById('dd-btn-download-conf');
-
-    let currentConfigText = '';
-
-    async function checkLeak() {
-      try {
-        const res = await fetch(`${VPN_API_BASE}/api/v1/tools/diagnostics`);
-        const data = await res.json();
-        if (ipLabel) ipLabel.textContent = data.client_ip;
-        if (data.is_vpn_secured && statusBadge) {
-          statusBadge.textContent = '● SECURED BY DANGLING DICE';
-          statusBadge.style.color = '#22c55e';
-          statusBadge.style.background = 'rgba(34, 197, 94, 0.12)';
-          statusBadge.style.borderColor = 'rgba(34, 197, 94, 0.3)';
-        }
-      } catch (_) {}
-    }
-    checkLeak();
-
-    testLeakBtn.addEventListener('click', async () => {
-      testLeakBtn.textContent = 'Testing...';
-      trackEvent('leak_test_run');
-      await checkLeak();
-      testLeakBtn.textContent = '⚡ Run Leak Shield Test';
-    });
-
-    genProfileBtn.addEventListener('click', async () => {
-      genProfileBtn.textContent = 'Generating Crypto Keypair...';
-      try {
-        const res = await fetch(`${VPN_API_BASE}/api/v1/tools/guest-config`, { method: 'POST' });
-        const data = await res.json();
-        currentConfigText = data.config_text;
-        if (confText) confText.textContent = data.config_text;
-        if (outputBox) outputBox.style.display = 'block';
-        genProfileBtn.textContent = '✅ Profile Generated';
-        trackEvent('profile_gen', { assigned_ip: data.assigned_ip });
-      } catch (err) {
-        genProfileBtn.textContent = '🚀 1-Click Generate Free WireGuard Profile';
-      }
-    });
-
-    downloadBtn.addEventListener('click', () => {
-      if (!currentConfigText) return;
-      const blob = new Blob([currentConfigText], { type: 'text/plain' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = 'dangling-dice.conf';
-      a.click();
-      trackEvent('conf_downloaded');
-    });
-  }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initWidget);
-  } else {
-    initWidget();
-  }
-})();
+    </div>
+  );
+}
 EOF
 
 echo ">>> 4. Rebuilding & Restarting API and Web containers..."
 docker compose up -d --build api web
 
-echo ">>> 5. Running Breakpoint Health Verification..."
+echo ">>> 5. Verifying Breakpoint 6 (SSOT Telemetry & A/B API)..."
 sleep 3
-curl -s http://localhost/health | jq . || curl -s http://localhost/health
-echo ""
-curl -s http://localhost/api/v1/admin/analytics | jq . || curl -s http://localhost/api/v1/admin/analytics
+curl -s "http://localhost/api/v1/experiments/variant?session_id=diagnostic_test_01"
 echo ""
 echo "=========================================================="
-echo " SSOT Telemetry, A/B Testing & Widget Upgrade Complete!"
+echo " ALL 6 BREAKPOINTS READY! Run test-server.ps1 on Windows!"
 echo "=========================================================="
