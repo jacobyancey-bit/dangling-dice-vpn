@@ -610,13 +610,90 @@ export default function AdminAnalyticsPage() {
 }
 EOF
 
-echo ">>> 4. Rebuilding & Restarting API and Web containers..."
-docker compose up -d --build api web
+echo ">>> 4. Updating Caddyfile for danglingdicestudios.duckdns.org (Auto-HTTPS)..."
+cat << 'EOF' > Caddyfile
+{
+    admin off
+}
 
-echo ">>> 5. Verifying Breakpoint 6 (SSOT Telemetry & A/B API)..."
+danglingdicestudios.duckdns.org {
+    encode zstd gzip
+
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Access-Control-Allow-Origin "*"
+        Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+        Access-Control-Allow-Headers "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization"
+    }
+
+    handle /api/* {
+        reverse_proxy api:8080 {
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+
+    handle /health {
+        reverse_proxy api:8080 {
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+        }
+    }
+
+    handle {
+        reverse_proxy web:3000 {
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+        }
+    }
+}
+
+http://165.245.142.71, http://localhost {
+    encode zstd gzip
+
+    header {
+        Access-Control-Allow-Origin "*"
+        Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+        Access-Control-Allow-Headers "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization"
+    }
+
+    handle /api/* {
+        reverse_proxy api:8080 {
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+
+    handle /health {
+        reverse_proxy api:8080 {
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+        }
+    }
+
+    handle {
+        reverse_proxy web:3000 {
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+        }
+    }
+}
+EOF
+
+echo ">>> 5. Rebuilding & Restarting Caddy, API, and Web containers..."
+docker compose up -d --build api web
+docker compose restart caddy
+
+echo ">>> 6. Verifying Breakpoint 6 (SSOT Telemetry & A/B API)..."
 sleep 3
 curl -s "http://localhost/api/v1/experiments/variant?session_id=diagnostic_test_01"
 echo ""
 echo "=========================================================="
-echo " ALL 6 BREAKPOINTS READY! Run test-server.ps1 on Windows!"
+echo " ALL 6 BREAKPOINTS & HTTPS READY: https://danglingdicestudios.duckdns.org"
 echo "=========================================================="
