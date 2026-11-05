@@ -82,7 +82,9 @@ fun HomeScreen(
                 Image(
                     painter = painterResource(id = R.drawable.ic_logo),
                     contentDescription = "Logo",
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(8.dp))
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Column {

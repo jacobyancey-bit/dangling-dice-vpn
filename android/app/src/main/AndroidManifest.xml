@@ -18,9 +18,9 @@
         android:name=".DanglingApplication"
         android:allowBackup="true"
         android:usesCleartextTraffic="true"
-        android:icon="@drawable/ic_logo"
+        android:icon="@mipmap/ic_launcher"
         android:label="Dangling Dice"
-        android:roundIcon="@drawable/ic_logo"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.NoActionBar"
         tools:targetApi="34">
@@ -51,7 +51,7 @@
         <service
             android:name=".vpn.DanglingQuickTileService"
             android:exported="true"
-            android:icon="@drawable/ic_logo"
+            android:icon="@drawable/ic_qs_shield"
             android:label="Dangling Dice VPN"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
             <intent-filter>
