@@ -109,8 +109,14 @@ class WireGuardTunnelManager(
                     adBlockEnabled = _adBlockEnabled.value
                 )
 
-                val assignedIp = registration?.first ?: "10.8.0.2/24"
-                val serverPubKey = registration?.second ?: server.publicKey
+                // Never allow a false-positive connection if server registration fails
+                if (registration == null || registration.second.isBlank()) {
+                    _status.value = ConnectionStatus.DISCONNECTED
+                    return@launch
+                }
+
+                val assignedIp = registration.first
+                val serverPubKey = registration.second
                 val dnsTarget = if (_adBlockEnabled.value) "94.140.14.14" else "1.1.1.1"
 
                 // 3. Build WireGuard Configuration with Split-Tunneling & Ad-Block DNS support

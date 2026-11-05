@@ -339,16 +339,8 @@ func (s *ServerState) handleRegisterPeer(w http.ResponseWriter, r *http.Request)
 	// Derive deterministic Zero-Login Account Token from device's Curve25519 PublicKey
 	accountToken := deriveAccountToken(req.PublicKey)
 
-	// Apply dynamically to WireGuard interface via 'wg set'
-	// Format: wg set wg0 peer <PubKey> allowed-ips <IP>/32
-	go func(pubKey, ip string) {
-		cmd := exec.Command("wg", "set", s.cfg.WGInterface, "peer", pubKey, "allowed-ips", ip+"/32")
-		if output, err := cmd.CombinedOutput(); err != nil {
-			log.Printf("Warning: wg set failed (simulated if running in dev without host wg): %v - %s", err, string(output))
-		} else {
-			log.Printf("Registered peer %s with IP %s", pubKey, ip)
-		}
-	}(req.PublicKey, assignedIP)
+	// Apply synchronously to the host's WireGuard interface (wg0) before returning 200 OK
+	s.applyWireGuardPeer(req.PublicKey, assignedIP)
 
 	jsonResponse(w, http.StatusOK, map[string]interface{}{
 		"assigned_ip":       assignedIP + "/24",
@@ -387,8 +379,8 @@ func (s *ServerState) handleGenerateGuestConfig(w http.ResponseWriter, r *http.R
 		dnsServer = "94.140.14.14, 94.140.15.15"
 	}
 
-	// Apply to WireGuard
-	exec.Command("wg", "set", s.cfg.WGInterface, "peer", pubKey, "allowed-ips", assignedIP+"/32").Run()
+	// Apply to host WireGuard interface synchronously
+	s.applyWireGuardPeer(pubKey, assignedIP)
 
 	// Build raw .conf profile text
 	rawConf := fmt.Sprintf(`[Interface]
@@ -604,6 +596,23 @@ func (s *ServerState) handleGetAnalyticsSummary(w http.ResponseWriter, r *http.R
 }
 
 // Helpers
+func (s *ServerState) applyWireGuardPeer(pubKey, assignedIP string) {
+	// 1. Enter host network namespace (PID 1) so Docker container configures the host's wg0 interface
+	cmd := exec.Command("nsenter", "-t", "1", "-n", "wg", "set", s.cfg.WGInterface, "peer", pubKey, "allowed-ips", assignedIP+"/32")
+	if output, err := cmd.CombinedOutput(); err == nil {
+		log.Printf("Registered WireGuard peer %s on host %s with IP %s", pubKey, s.cfg.WGInterface, assignedIP)
+		return
+	} else {
+		// 2. Fallback to direct wg set if running directly on host
+		cmdDirect := exec.Command("wg", "set", s.cfg.WGInterface, "peer", pubKey, "allowed-ips", assignedIP+"/32")
+		if out2, err2 := cmdDirect.CombinedOutput(); err2 != nil {
+			log.Printf("Warning: wg set failed: nsenter=(%v: %s), direct=(%v: %s)", err, string(output), err2, string(out2))
+		} else {
+			log.Printf("Registered WireGuard peer %s directly with IP %s", pubKey, assignedIP)
+		}
+	}
+}
+
 func isValidWireGuardKey(pubKey string) bool {
 	decoded, err := base64.StdEncoding.DecodeString(strings.TrimSpace(pubKey))
 	return err == nil && len(decoded) == 32

@@ -16,9 +16,8 @@
         android:name=".DanglingApplication"
         android:allowBackup="true"
         android:usesCleartextTraffic="true"
-        android:icon="@mipmap/ic_launcher"
+        android:icon="@android:drawable/sym_def_app_icon"
         android:label="Dangling Dice"
-        android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.NoActionBar"
         tools:targetApi="34">

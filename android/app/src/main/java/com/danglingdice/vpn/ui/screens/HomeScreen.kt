@@ -65,7 +65,7 @@ fun HomeScreen(
                 Spacer(modifier = Modifier.width(8.dp))
                 Column {
                     Text(
-                        text = "Dangling Dice",
+                        text = "Dangling Dice ",
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
@@ -255,4 +255,17 @@ fun formatDuration(seconds: Long): String {
     val secs = seconds % 60
     return if (hrs > 0) String.format("%02d:%02d:%02d", hrs, mins, secs) else String.format("%02d:%02d", mins, secs)
 }
+
+@androidx.compose.ui.tooling.preview.Preview(showBackground = true, backgroundColor = 0xFF020617)
+@Composable
+fun HomeScreenPreview() {
+    HomeScreen(
+        status = ConnectionStatus.CONNECTED,
+        stats = TunnelStats(rxBytes = 14_500_000, txBytes = 2_100_000, durationSeconds = 345),
+        selectedServer = ServerNode("us-east-1", "US East (N. Virginia)", "10.0.0.1:51820", "pubkey123", true, 42),
+        onToggleConnection = {},
+        onSelectServerClick = {}
+    )
+}
+
 

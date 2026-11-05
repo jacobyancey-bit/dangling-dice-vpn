@@ -26,3 +26,4 @@ if [ "$LOCAL_SHA" != "$REMOTE_SHA" ]; then
         echo "[$(date -u)] Only Android/client files changed; skipping Docker rebuild."
     fi
 fi
+
