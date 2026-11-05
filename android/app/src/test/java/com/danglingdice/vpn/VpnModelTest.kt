@@ -50,6 +50,8 @@ class VpnModelTest {
         assertEquals(0L, stats.rxBytes)
         assertEquals(0L, stats.txBytes)
         assertEquals(ConnectionStatus.DISCONNECTED, ConnectionStatus.valueOf("DISCONNECTED"))
+        assertEquals(ConnectionStatus.VERIFYING_HANDSHAKE, ConnectionStatus.valueOf("VERIFYING_HANDSHAKE"))
+        assertEquals(ConnectionStatus.ERROR, ConnectionStatus.valueOf("ERROR"))
     }
 }
 

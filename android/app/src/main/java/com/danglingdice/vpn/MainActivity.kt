@@ -35,6 +35,8 @@ class MainActivity : ComponentActivity() {
             pendingServerToConnect?.let { server ->
                 tunnelManager.connect(server)
             }
+        } else {
+            tunnelManager.reportPermissionDenied()
         }
     }
 
@@ -68,6 +70,7 @@ fun MainAppScaffold(
 ) {
     var selectedTab by remember { mutableStateOf(0) }
     val status by tunnelManager.status.collectAsState()
+    val statusDetail by tunnelManager.statusDetail.collectAsState()
     val stats by tunnelManager.stats.collectAsState()
     val excludedApps by tunnelManager.excludedApps.collectAsState()
 
@@ -152,10 +155,11 @@ fun MainAppScaffold(
             when (selectedTab) {
                 0 -> HomeScreen(
                     status = status,
+                    statusDetail = statusDetail,
                     stats = stats,
                     selectedServer = selectedServer,
                     onToggleConnection = {
-                        if (status == ConnectionStatus.CONNECTED) {
+                        if (status == ConnectionStatus.CONNECTED || status == ConnectionStatus.VERIFYING_HANDSHAKE || status == ConnectionStatus.CONNECTING) {
                             tunnelManager.disconnect()
                         } else {
                             onConnectRequested(selectedServer)

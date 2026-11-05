@@ -28,9 +28,14 @@ import com.danglingdice.vpn.data.model.ServerNode
 import com.danglingdice.vpn.data.model.TunnelStats
 import com.danglingdice.vpn.ui.theme.*
 
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
+import com.danglingdice.vpn.R
+
 @Composable
 fun HomeScreen(
     status: ConnectionStatus,
+    statusDetail: String = "",
     stats: TunnelStats,
     selectedServer: ServerNode,
     onToggleConnection: () -> Unit,
@@ -40,7 +45,9 @@ fun HomeScreen(
         targetValue = when (status) {
             ConnectionStatus.CONNECTED -> Emerald500
             ConnectionStatus.CONNECTING -> Amber500
+            ConnectionStatus.VERIFYING_HANDSHAKE -> Amber500
             ConnectionStatus.DISCONNECTING -> Amber500
+            ConnectionStatus.ERROR -> Red500
             ConnectionStatus.DISCONNECTED -> Slate800
         },
         label = "ButtonColor"
@@ -61,17 +68,21 @@ fun HomeScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(text = "🎲", fontSize = 28.sp)
+                Image(
+                    painter = painterResource(id = R.drawable.ic_logo),
+                    contentDescription = "Logo",
+                    modifier = Modifier.size(32.dp)
+                )
                 Spacer(modifier = Modifier.width(8.dp))
                 Column {
                     Text(
-                        text = "Dangling Dice ",
+                        text = "Dangling Dice VPN",
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
                     )
                     Text(
-                        text = "Zero-Login • Hardware Key Auth",
+                        text = "Hardware | Key | Auth",
                         fontSize = 11.sp,
                         color = Emerald500,
                         fontFamily = FontFamily.Monospace
@@ -80,11 +91,21 @@ fun HomeScreen(
             }
 
             Surface(
-                color = if (status == ConnectionStatus.CONNECTED) Emerald500.copy(alpha = 0.15f) else Slate800,
+                color = when (status) {
+                    ConnectionStatus.CONNECTED -> Emerald500.copy(alpha = 0.15f)
+                    ConnectionStatus.ERROR -> Red500.copy(alpha = 0.15f)
+                    ConnectionStatus.CONNECTING, ConnectionStatus.VERIFYING_HANDSHAKE -> Amber500.copy(alpha = 0.15f)
+                    else -> Slate800
+                },
                 shape = RoundedCornerShape(12.dp),
                 border = androidx.compose.foundation.BorderStroke(
                     1.dp,
-                    if (status == ConnectionStatus.CONNECTED) Emerald500.copy(alpha = 0.4f) else Color.Transparent
+                    when (status) {
+                        ConnectionStatus.CONNECTED -> Emerald500.copy(alpha = 0.4f)
+                        ConnectionStatus.ERROR -> Red500.copy(alpha = 0.4f)
+                        ConnectionStatus.CONNECTING, ConnectionStatus.VERIFYING_HANDSHAKE -> Amber500.copy(alpha = 0.4f)
+                        else -> Color.Transparent
+                    }
                 )
             ) {
                 Row(
@@ -94,15 +115,31 @@ fun HomeScreen(
                     Icon(
                         imageVector = Icons.Default.Shield,
                         contentDescription = null,
-                        tint = if (status == ConnectionStatus.CONNECTED) Emerald500 else Slate400,
+                        tint = when (status) {
+                            ConnectionStatus.CONNECTED -> Emerald500
+                            ConnectionStatus.ERROR -> Red500
+                            ConnectionStatus.CONNECTING, ConnectionStatus.VERIFYING_HANDSHAKE -> Amber500
+                            else -> Slate400
+                        },
                         modifier = Modifier.size(16.dp)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = if (status == ConnectionStatus.CONNECTED) "PROTECTED" else "UNPROTECTED",
+                        text = when (status) {
+                            ConnectionStatus.CONNECTED -> "VERIFIED SECURE"
+                            ConnectionStatus.VERIFYING_HANDSHAKE -> "HANDSHAKING..."
+                            ConnectionStatus.CONNECTING -> "CONNECTING..."
+                            ConnectionStatus.ERROR -> "CONNECTION ISSUE"
+                            else -> "UNPROTECTED"
+                        },
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
-                        color = if (status == ConnectionStatus.CONNECTED) Emerald500 else Slate400
+                        color = when (status) {
+                            ConnectionStatus.CONNECTED -> Emerald500
+                            ConnectionStatus.ERROR -> Red500
+                            ConnectionStatus.CONNECTING, ConnectionStatus.VERIFYING_HANDSHAKE -> Amber500
+                            else -> Slate400
+                        }
                     )
                 }
             }
@@ -146,22 +183,39 @@ fun HomeScreen(
 
             Text(
                 text = when (status) {
-                    ConnectionStatus.CONNECTED -> "CONNECTED"
-                    ConnectionStatus.CONNECTING -> "CONNECTING..."
+                    ConnectionStatus.CONNECTED -> "CONNECTED & VERIFIED"
+                    ConnectionStatus.VERIFYING_HANDSHAKE -> "VERIFYING HANDSHAKE..."
+                    ConnectionStatus.CONNECTING -> "REGISTERING KEY..."
                     ConnectionStatus.DISCONNECTING -> "DISCONNECTING..."
+                    ConnectionStatus.ERROR -> "CONNECTION FAILED — TAP TO RETRY"
                     ConnectionStatus.DISCONNECTED -> "NOT CONNECTED"
                 },
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.White
+                color = when (status) {
+                    ConnectionStatus.CONNECTED -> Emerald500
+                    ConnectionStatus.ERROR -> Red500
+                    ConnectionStatus.CONNECTING, ConnectionStatus.VERIFYING_HANDSHAKE -> Amber500
+                    else -> Color.White
+                }
             )
+
+            if (statusDetail.isNotBlank()) {
+                Text(
+                    text = statusDetail,
+                    fontSize = 12.sp,
+                    color = if (status == ConnectionStatus.ERROR) Red500 else Slate400,
+                    modifier = Modifier.padding(top = 6.dp, start = 16.dp, end = 16.dp),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+            }
 
             if (status == ConnectionStatus.CONNECTED) {
                 Text(
                     text = formatDuration(stats.durationSeconds),
                     fontSize = 13.sp,
                     fontFamily = FontFamily.Monospace,
-                    color = Slate400,
+                    color = Emerald500,
                     modifier = Modifier.padding(top = 4.dp)
                 )
             }

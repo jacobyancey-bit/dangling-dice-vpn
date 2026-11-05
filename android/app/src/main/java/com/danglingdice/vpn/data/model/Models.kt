@@ -12,8 +12,10 @@ data class ServerNode(
 enum class ConnectionStatus {
     DISCONNECTED,
     CONNECTING,
+    VERIFYING_HANDSHAKE,
     CONNECTED,
-    DISCONNECTING
+    DISCONNECTING,
+    ERROR
 }
 
 data class TunnelStats(
@@ -33,4 +35,3 @@ data class LeakReport(
     val isVpnSecured: Boolean = false,
     val serverNode: String = "Direct Link"
 )
-

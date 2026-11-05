@@ -32,6 +32,9 @@ class WireGuardTunnelManager(
     private val _status = MutableStateFlow(ConnectionStatus.DISCONNECTED)
     val status: StateFlow<ConnectionStatus> = _status.asStateFlow()
 
+    private val _statusDetail = MutableStateFlow("Tap the power dial to establish an encrypted WireGuard tunnel")
+    val statusDetail: StateFlow<String> = _statusDetail.asStateFlow()
+
     private val _stats = MutableStateFlow(TunnelStats())
     val stats: StateFlow<TunnelStats> = _stats.asStateFlow()
 
@@ -73,16 +76,25 @@ class WireGuardTunnelManager(
     init {
         scope.launch {
             tunnel.state.collect { wireguardState ->
-                _status.value = when (wireguardState) {
+                when (wireguardState) {
                     Tunnel.State.UP -> {
-                        startStatsMonitoring()
-                        ConnectionStatus.CONNECTED
+                        // Do NOT mark CONNECTED yet — verify real return bytes (RX > 0) first!
+                        if (_status.value != ConnectionStatus.CONNECTED) {
+                            _status.value = ConnectionStatus.VERIFYING_HANDSHAKE
+                            _statusDetail.value = "Verifying cryptographic UDP handshake with 165.245.142.71:51820..."
+                        }
+                        startStatsAndHandshakeVerification()
                     }
                     Tunnel.State.DOWN -> {
                         stopStatsMonitoring()
-                        ConnectionStatus.DISCONNECTED
+                        if (_status.value != ConnectionStatus.ERROR) {
+                            _status.value = ConnectionStatus.DISCONNECTED
+                            _statusDetail.value = "Tunnel disconnected"
+                        }
                     }
-                    Tunnel.State.TOGGLE -> ConnectionStatus.CONNECTING
+                    Tunnel.State.TOGGLE -> {
+                        _status.value = ConnectionStatus.CONNECTING
+                    }
                 }
             }
         }
@@ -96,13 +108,19 @@ class WireGuardTunnelManager(
         _adBlockEnabled.value = enabled
     }
 
+    fun reportPermissionDenied() {
+        _status.value = ConnectionStatus.ERROR
+        _statusDetail.value = "Android VPN permission was denied. Please tap Connect and press OK."
+    }
+
     fun connect(server: ServerNode) {
-        if (_status.value != ConnectionStatus.DISCONNECTED) return
+        if (_status.value == ConnectionStatus.CONNECTING || _status.value == ConnectionStatus.VERIFYING_HANDSHAKE) return
         _status.value = ConnectionStatus.CONNECTING
+        _statusDetail.value = "Step 1/3: Registering Zero-Login hardware key (${_accountToken.value})..."
 
         scope.launch(Dispatchers.IO) {
             try {
-                // 1. Register persistent device Curve25519 public key with server control plane (Zero-Login Auth)
+                // 1. Register persistent device Curve25519 public key with server control plane
                 val registration = apiClient.registerPeer(
                     publicKey = clientKeyPair.publicKey.toBase64(),
                     deviceName = "Android-${android.os.Build.MODEL}",
@@ -111,7 +129,8 @@ class WireGuardTunnelManager(
 
                 // Never allow a false-positive connection if server registration fails
                 if (registration == null || registration.second.isBlank()) {
-                    _status.value = ConnectionStatus.DISCONNECTED
+                    _status.value = ConnectionStatus.ERROR
+                    _statusDetail.value = "Connection Failed: Could not reach VPN Control Plane API (${server.endpoint}). Check internet connection."
                     return@launch
                 }
 
@@ -119,13 +138,14 @@ class WireGuardTunnelManager(
                 val serverPubKey = registration.second
                 val dnsTarget = if (_adBlockEnabled.value) "94.140.14.14" else "1.1.1.1"
 
-                // 3. Build WireGuard Configuration with Split-Tunneling & Ad-Block DNS support
+                _statusDetail.value = "Step 2/3: Assigned VPN IP $assignedIp. Bringing up WireGuard interface..."
+
+                // 2. Build WireGuard Configuration with Split-Tunneling & Ad-Block DNS support
                 val ifaceBuilder = Interface.Builder()
                     .parsePrivateKey(clientKeyPair.privateKey.toBase64())
                     .addAddress(com.wireguard.config.InetNetwork.parse(assignedIp))
                     .addDnsServer(InetAddress.getByName(dnsTarget))
 
-                // Apply Split Tunneling exclusions
                 if (_excludedApps.value.isNotEmpty()) {
                     ifaceBuilder.excludeApplications(_excludedApps.value)
                 }
@@ -141,13 +161,13 @@ class WireGuardTunnelManager(
                     .addPeer(peerBuilder.build())
                     .build()
 
-                // 4. Activate in-kernel / GoBackend tunnel
+                // 3. Activate in-kernel / GoBackend tunnel (triggers Tunnel.State.UP -> VERIFYING_HANDSHAKE)
                 connectionStartTime = System.currentTimeMillis()
                 DanglingApplication.instance.wireGuardBackend.setState(tunnel, Tunnel.State.UP, config)
-                apiClient.trackEvent("vpn_handshake", mapOf("node" to server.id))
 
             } catch (e: Exception) {
-                _status.value = ConnectionStatus.DISCONNECTED
+                _status.value = ConnectionStatus.ERROR
+                _statusDetail.value = "Tunnel Error: ${e.localizedMessage ?: "Failed to configure WireGuard interface"}"
             }
         }
     }
@@ -155,38 +175,70 @@ class WireGuardTunnelManager(
     fun disconnect() {
         if (_status.value == ConnectionStatus.DISCONNECTED) return
         _status.value = ConnectionStatus.DISCONNECTING
+        _statusDetail.value = "Closing encrypted WireGuard tunnel..."
 
         scope.launch(Dispatchers.IO) {
             try {
                 DanglingApplication.instance.wireGuardBackend.setState(tunnel, Tunnel.State.DOWN, null)
+                _status.value = ConnectionStatus.DISCONNECTED
+                _statusDetail.value = "Tunnel disconnected"
             } catch (e: Exception) {
                 _status.value = ConnectionStatus.DISCONNECTED
+                _statusDetail.value = "Tunnel disconnected"
             }
         }
     }
 
-    private fun startStatsMonitoring() {
+    private fun startStatsAndHandshakeVerification() {
         statsJob?.cancel()
         statsJob = scope.launch(Dispatchers.IO) {
+            // Fire an active probe through the tunnel to force immediate two-way UDP handshake traffic
+            launch {
+                try {
+                    apiClient.fetchDiagnostics()
+                } catch (_: Exception) {}
+            }
+
+            var handshakeVerified = false
+            val verifyDeadline = System.currentTimeMillis() + 9_000L // 9-second strict handshake window
+
             while (isActive) {
                 try {
                     val backendStats = DanglingApplication.instance.wireGuardBackend.getStatistics(tunnel)
+                    val rx = backendStats.totalRx()
+                    val tx = backendStats.totalTx()
                     val elapsedSeconds = (System.currentTimeMillis() - connectionStartTime) / 1000
+
                     _stats.value = TunnelStats(
-                        rxBytes = backendStats.totalRx(),
-                        txBytes = backendStats.totalTx(),
+                        rxBytes = rx,
+                        txBytes = tx,
                         durationSeconds = elapsedSeconds
                     )
+
+                    if (!handshakeVerified) {
+                        if (rx > 0L) {
+                            // Cryptographic proof: the WireGuard server decrypted our packet and replied!
+                            handshakeVerified = true
+                            connectionStartTime = System.currentTimeMillis()
+                            _status.value = ConnectionStatus.CONNECTED
+                            _statusDetail.value = "Verified: Encrypted traffic flowing via 165.245.142.71:51820"
+                            launch { apiClient.trackEvent("vpn_handshake", mapOf("verified_rx" to rx.toString())) }
+                        } else if (System.currentTimeMillis() > verifyDeadline) {
+                            // Zero bytes received after 9 seconds -> Tear down tunnel so phone internet isn't blackholed!
+                            _status.value = ConnectionStatus.ERROR
+                            _statusDetail.value = "Handshake Timeout: Sent $tx B to 165.245.142.71:51820, received 0 B back. Sync server wg0 interface."
+                            DanglingApplication.instance.wireGuardBackend.setState(tunnel, Tunnel.State.DOWN, null)
+                            break
+                        }
+                    }
                 } catch (_: Exception) {}
-                delay(1000)
+                delay(500)
             }
         }
     }
 
     private fun stopStatsMonitoring() {
         statsJob?.cancel()
-        statsJob = null
-        _stats.value = TunnelStats()
+        _stats.value = TunnelStats(0, 0, 0)
     }
 }
-
