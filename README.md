@@ -57,9 +57,9 @@ cp .env.example .env
 nano .env
 ```
 Update the following key fields:
-- `DOMAIN`: Your primary domain (e.g., `danglingdice.com`).
-- `API_DOMAIN`: Your API subdomain (e.g., `api.danglingdice.com`).
-- `TOOLS_DOMAIN`: Your developer tools subdomain (e.g., `tools.danglingdice.com`).
+- `DOMAIN`: Your primary domain 
+- `API_DOMAIN`: Your API subdomain 
+- `TOOLS_DOMAIN`: Your developer tools subdomain 
 - `SERVER_PUBLIC_IP`: The public IPv4 address of your Droplet.
 - `POSTGRES_PASSWORD` and `JWT_SECRET`: Secure random passwords.
 
