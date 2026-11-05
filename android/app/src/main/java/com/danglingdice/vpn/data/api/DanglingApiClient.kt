@@ -12,7 +12,7 @@ import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
 class DanglingApiClient(
-    private val baseUrl: String = "http://165.245.142.71"
+    private val baseUrl: String = "https://vpn.danglingdicestudios.duckdns.org"
 ) {
     private val client = OkHttpClient.Builder()
         .connectTimeout(5, TimeUnit.SECONDS)
