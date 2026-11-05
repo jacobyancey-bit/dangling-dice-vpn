@@ -13,7 +13,12 @@ echo ">>> 2. Rebuilding & Starting Isolated Containers (studio, web, api) and Ca
 docker compose up -d --build api web studio
 docker compose restart caddy
 
-echo ">>> 3. Verifying All Endpoints (Studio Website, Catalog API, VPN API & SSOT Telemetry)..."
+echo ">>> 3. Installing Automatic GitHub Background Sync (Checks every 60s)..."
+chmod +x /root/dangling-dice/infra/auto-sync-watcher.sh
+(crontab -l 2>/dev/null | grep -v "auto-sync-watcher.sh" || true; echo "* * * * * /bin/bash /root/dangling-dice/infra/auto-sync-watcher.sh >> /var/log/dangling-autodeploy.log 2>&1") | crontab -
+echo "   [OK] Auto-Deploy Cron Installed! Future git pushes will deploy automatically."
+
+echo ">>> 4. Verifying All Endpoints (Studio Website, Catalog API, VPN API & SSOT Telemetry)..."
 sleep 3
 echo -n "Healthcheck (/health): "
 curl -s http://localhost/health
