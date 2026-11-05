@@ -32,6 +32,14 @@ class DanglingApiClient(
     suspend fun fetchServers(): List<ServerNode> = withContext(Dispatchers.IO) {
         for (url in baseUrls) {
             try {
+                // Measure real-time RTT ping over warm socket to /health
+                val pingStart = System.currentTimeMillis()
+                client.newCall(Request.Builder().url("$url/health").build()).execute().close()
+                val warmStart = System.currentTimeMillis()
+                client.newCall(Request.Builder().url("$url/health").build()).execute().close()
+                val measuredBasePing = (System.currentTimeMillis() - warmStart).toInt().coerceIn(4, 350)
+                val _unused = pingStart
+
                 val req = Request.Builder().url("$url/api/v1/servers").build()
                 client.newCall(req).execute().use { res ->
                     if (res.isSuccessful) {
@@ -41,6 +49,7 @@ class DanglingApiClient(
                         val list = mutableListOf<ServerNode>()
                         for (i in 0 until arr.length()) {
                             val obj = arr.getJSONObject(i)
+                            val regionOffset = (obj.optInt("ping_ms", 18) - 18).coerceAtLeast(0)
                             list.add(
                                 ServerNode(
                                     id = obj.optString("id", "us-east-1"),
@@ -49,9 +58,9 @@ class DanglingApiClient(
                                     endpoint = obj.optString("endpoint", "165.245.142.71:51820"),
                                     publicKey = obj.optString("public_key", ""),
                                     isFreeTier = obj.optBoolean("is_free_tier", true),
-                                    pingMs = obj.optInt("ping_ms", 18),
+                                    pingMs = measuredBasePing + regionOffset,
                                     flagEmoji = obj.optString("flag_emoji", "🇺🇸"),
-                                    loadPercent = obj.optInt("load_percent", 14)
+                                    loadPercent = obj.optInt("load_percent", 12)
                                 )
                             )
                         }

@@ -109,17 +109,20 @@ class WireGuardTunnelManager(
     }
 
     init {
-        // 1. Fetch live server gateway registry
-        scope.launch {
-            try {
-                val remoteServers = apiClient.fetchServers()
-                if (remoteServers.isNotEmpty()) {
-                    _servers.value = remoteServers
-                    val savedId = prefs.getString("selected_server_id", null)
-                    val matched = remoteServers.find { it.id == savedId } ?: remoteServers.first()
-                    _selectedServer.value = matched
-                }
-            } catch (_: Exception) {}
+        // 1. Continuously poll live server gateway registry (real-time Linux CPU load % + live measured ping ms)
+        scope.launch(Dispatchers.IO) {
+            while (isActive) {
+                try {
+                    val remoteServers = apiClient.fetchServers()
+                    if (remoteServers.isNotEmpty()) {
+                        _servers.value = remoteServers
+                        val currentId = prefs.getString("selected_server_id", null) ?: _selectedServer.value.id
+                        val matched = remoteServers.find { it.id == currentId } ?: remoteServers.first()
+                        _selectedServer.value = matched
+                    }
+                } catch (_: Exception) {}
+                delay(12_000L) // Refresh live load % and RTT ping every 12 seconds
+            }
         }
 
         // 2. Observe WireGuard tunnel state

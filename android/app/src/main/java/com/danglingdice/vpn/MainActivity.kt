@@ -13,6 +13,8 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -39,6 +41,7 @@ import com.danglingdice.vpn.ui.screens.DiagnosticsScreen
 import com.danglingdice.vpn.ui.screens.HomeScreen
 import com.danglingdice.vpn.ui.screens.KillSwitchScreen
 import com.danglingdice.vpn.ui.screens.SplitTunnelScreen
+import com.danglingdice.vpn.ui.theme.Amber500
 import com.danglingdice.vpn.ui.theme.DanglingDiceTheme
 import com.danglingdice.vpn.ui.theme.Emerald500
 import com.danglingdice.vpn.ui.theme.Slate400
