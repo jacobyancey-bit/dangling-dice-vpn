@@ -83,6 +83,9 @@ vpn.danglingdicestudios.duckdns.org {
         reverse_proxy web:3000 {
             header_up Host {host}
             header_up X-Real-IP {remote_host}
+            # Block crafted WebSocket upgrade SSRF requests at the reverse proxy
+            header_up -Upgrade
+            header_up -Connection
         }
     }
 }
