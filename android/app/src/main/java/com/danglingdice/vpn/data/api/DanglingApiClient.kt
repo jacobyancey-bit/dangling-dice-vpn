@@ -1,5 +1,6 @@
 package com.danglingdice.vpn.data.api
 
+import com.danglingdice.vpn.data.model.DevProbeResult
 import com.danglingdice.vpn.data.model.LeakReport
 import com.danglingdice.vpn.data.model.ServerNode
 import com.danglingdice.vpn.data.model.SpeedTestResult
@@ -200,5 +201,72 @@ class DanglingApiClient(
             } catch (_: Exception) {}
         }
         return@withContext LeakReport(clientIp = "Direct Link", isVpnSecured = false)
+    }
+
+    suspend fun runDevProbe(rawTarget: String): DevProbeResult = withContext(Dispatchers.IO) {
+        val cleaned = rawTarget.trim()
+            .removePrefix("https://")
+            .removePrefix("http://")
+            .trimEnd('/')
+        if (cleaned.isBlank()) {
+            return@withContext DevProbeResult(targetHost = "", error = "Enter a hostname or API domain")
+        }
+        val hostOnly = cleaned.substringBefore("/").substringBefore(":")
+        val probeUrl = if (rawTarget.trim().startsWith("http://") || rawTarget.trim().startsWith("https://")) {
+            rawTarget.trim()
+        } else {
+            "https://$cleaned"
+        }
+
+        val resolvedIps = try {
+            java.net.InetAddress.getAllByName(hostOnly)
+                .mapNotNull { it.hostAddress }
+                .distinct()
+                .take(4)
+        } catch (e: Exception) {
+            return@withContext DevProbeResult(
+                targetHost = hostOnly,
+                error = "DNS Lookup Failed: ${e.localizedMessage ?: "NXDOMAIN"}"
+            )
+        }
+
+        val startNs = System.nanoTime()
+        try {
+            val req = Request.Builder()
+                .url(probeUrl)
+                .header("User-Agent", "DanglingDiceVPN-DevProbe/1.0")
+                .build()
+            client.newCall(req).execute().use { res ->
+                val elapsedMs = ((System.nanoTime() - startNs) / 1_000_000L).coerceAtLeast(1L)
+                val handshake = res.handshake
+                val tlsStr = if (handshake != null) {
+                    val cert = handshake.peerCertificates.firstOrNull() as? java.security.cert.X509Certificate
+                    val expiry = cert?.notAfter?.let {
+                        java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(it)
+                    } ?: "Valid"
+                    "${handshake.tlsVersion.javaName} • Cert exp $expiry"
+                } else {
+                    "Plaintext HTTP (No TLS)"
+                }
+
+                DevProbeResult(
+                    targetHost = hostOnly,
+                    resolvedIps = resolvedIps,
+                    httpStatus = "HTTP ${res.code} ${res.message}".trim(),
+                    responseTimeMs = elapsedMs,
+                    tlsInfo = tlsStr
+                )
+            }
+        } catch (e: Exception) {
+            val elapsedMs = ((System.nanoTime() - startNs) / 1_000_000L).coerceAtLeast(1L)
+            DevProbeResult(
+                targetHost = hostOnly,
+                resolvedIps = resolvedIps,
+                httpStatus = "Connection Error",
+                responseTimeMs = elapsedMs,
+                tlsInfo = "—",
+                error = e.localizedMessage ?: "HTTPS probe failed"
+            )
+        }
     }
 }

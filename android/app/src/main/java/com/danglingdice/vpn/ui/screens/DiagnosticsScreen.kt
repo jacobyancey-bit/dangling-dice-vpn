@@ -1,27 +1,35 @@
 package com.danglingdice.vpn.ui.screens
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.danglingdice.vpn.data.api.DanglingApiClient
+import com.danglingdice.vpn.data.model.DevProbeResult
 import com.danglingdice.vpn.data.model.LeakReport
 import com.danglingdice.vpn.data.model.SpeedTestResult
 import com.danglingdice.vpn.ui.theme.*
@@ -32,13 +40,28 @@ import kotlinx.coroutines.launch
 fun DiagnosticsScreen(
     onBackClick: () -> Unit
 ) {
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val apiClient = remember { DanglingApiClient() }
     var report by remember { mutableStateOf<LeakReport?>(null) }
     var isLoading by remember { mutableStateOf(true) }
+    var copiedIp by remember { mutableStateOf(false) }
 
     var speedResult by remember { mutableStateOf<SpeedTestResult?>(null) }
     var isRunningSpeedTest by remember { mutableStateOf(false) }
+
+    var probeInput by remember { mutableStateOf("dangling-dice-studios.com") }
+    var probeResult by remember { mutableStateOf<DevProbeResult?>(null) }
+    var isProbing by remember { mutableStateOf(false) }
+
+    fun runDevProbe() {
+        if (isProbing || probeInput.isBlank()) return
+        isProbing = true
+        scope.launch {
+            probeResult = apiClient.runDevProbe(probeInput)
+            isProbing = false
+        }
+    }
 
     fun runLeakTest() {
         isLoading = true
@@ -138,7 +161,30 @@ fun DiagnosticsScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        DiagnosticRow(title = "Detected Public IP", value = report?.clientIp ?: "Unknown")
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    val ip = report?.clientIp ?: return@clickable
+                                    val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                                    cm?.setPrimaryClip(ClipData.newPlainText("Public IP", ip))
+                                    copiedIp = true
+                                },
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(text = "Detected Public IP", color = Slate400, fontSize = 13.sp)
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(
+                                    text = if (copiedIp) "${report?.clientIp} (Copied ✓)" else (report?.clientIp ?: "Unknown"),
+                                    color = if (copiedIp) Emerald500 else Color.White,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp
+                                )
+                                Icon(Icons.Default.ContentCopy, contentDescription = "Copy IP", tint = Emerald500, modifier = Modifier.size(14.dp))
+                            }
+                        }
                         Divider(color = Slate800)
                         DiagnosticRow(title = "Active Exit Node", value = report?.serverNode ?: "Direct")
                         Divider(color = Slate800)
@@ -230,6 +276,102 @@ fun DiagnosticsScreen(
                             fontWeight = FontWeight.Bold,
                             fontSize = 14.sp
                         )
+                    }
+                }
+            }
+
+            // Developer Network Toolkit: Live DNS Lookup + HTTPS & SSL Certificate Inspector
+            Surface(
+                color = Slate900,
+                shape = RoundedCornerShape(16.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Slate800),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Terminal, contentDescription = null, tint = Emerald500, modifier = Modifier.size(22.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                text = "Developer DNS & SSL Probe",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 15.sp
+                            )
+                            Text(
+                                text = "Test API endpoints, DNS records & TLS certs over the tunnel",
+                                color = Slate400,
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+
+                    OutlinedTextField(
+                        value = probeInput,
+                        onValueChange = { probeInput = it },
+                        singleLine = true,
+                        label = { Text("Domain or API URL", color = Slate400, fontSize = 12.sp) },
+                        placeholder = { Text("api.example.com", color = Slate400) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Emerald500,
+                            unfocusedBorderColor = Slate800,
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            cursorColor = Emerald500
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Button(
+                        onClick = { runDevProbe() },
+                        enabled = !isProbing && probeInput.isNotBlank(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(44.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Slate800)
+                    ) {
+                        Text(
+                            text = if (isProbing) "Probing DNS & TLS..." else "🔍 Run Dev DNS / HTTPS Probe",
+                            color = Emerald500,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp
+                        )
+                    }
+
+                    probeResult?.let { res ->
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Slate950, RoundedCornerShape(12.dp))
+                                .border(1.dp, Slate800, RoundedCornerShape(12.dp))
+                                .padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            DiagnosticRow(
+                                title = "DNS IPs",
+                                value = if (res.resolvedIps.isNotEmpty()) res.resolvedIps.joinToString(", ") else "Unresolved"
+                            )
+                            Divider(color = Slate800)
+                            DiagnosticRow(
+                                title = "HTTP Status",
+                                value = "${res.httpStatus} (${res.responseTimeMs} ms)"
+                            )
+                            Divider(color = Slate800)
+                            DiagnosticRow(
+                                title = "TLS / SSL",
+                                value = res.tlsInfo
+                            )
+                            if (!res.error.isNullOrBlank()) {
+                                Divider(color = Slate800)
+                                Text(
+                                    text = "Error: ${res.error}",
+                                    color = Amber500,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 11.sp
+                                )
+                            }
+                        }
                     }
                 }
             }

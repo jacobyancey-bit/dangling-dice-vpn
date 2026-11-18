@@ -7,6 +7,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.AltRoute
 import androidx.compose.material.icons.filled.Home
@@ -20,6 +21,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -111,6 +114,8 @@ fun MainAppScaffold(
     val dnsProfile by tunnelManager.dnsProfile.collectAsState()
     val stealthModeEnabled by tunnelManager.stealthModeEnabled.collectAsState()
     val autoConnectWifiShield by tunnelManager.autoConnectWifiShield.collectAsState()
+    val allowLocalLanBypass by tunnelManager.allowLocalLanBypass.collectAsState()
+    val customDnsIp by tunnelManager.customDnsIp.collectAsState()
     val isPremiumUser by tunnelManager.isPremiumUser.collectAsState()
     val accountToken by tunnelManager.accountToken.collectAsState()
     val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
@@ -187,6 +192,7 @@ fun MainAppScaffold(
                     stats = stats,
                     selectedServer = selectedServer,
                     dnsProfile = dnsProfile,
+                    customDnsIp = customDnsIp,
                     stealthModeEnabled = stealthModeEnabled,
                     isPremiumUser = isPremiumUser,
                     accountToken = accountToken,
@@ -221,8 +227,12 @@ fun MainAppScaffold(
                 2 -> KillSwitchScreen(
                     stealthModeEnabled = stealthModeEnabled,
                     autoConnectWifiShield = autoConnectWifiShield,
+                    allowLocalLanBypass = allowLocalLanBypass,
+                    gatewayIp = selectedServer.endpoint.substringBefore(":"),
                     onToggleStealthMode = { tunnelManager.setStealthModeEnabled(it) },
                     onToggleAutoConnectWifi = { tunnelManager.setAutoConnectWifiShield(it) },
+                    onToggleLocalLanBypass = { tunnelManager.setAllowLocalLanBypass(it) },
+                    onExportWireGuardConfig = { tunnelManager.exportWireGuardConfig() },
                     onBackClick = { selectedTab = 0 }
                 )
                 3 -> DiagnosticsScreen(
@@ -252,6 +262,7 @@ fun MainAppScaffold(
                     },
                     text = {
                         androidx.compose.foundation.layout.Column(
+                            modifier = Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState()),
                             verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)
                         ) {
                             availableServers.forEach { node ->
@@ -275,6 +286,7 @@ fun MainAppScaffold(
                                         horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween
                                     ) {
                                         androidx.compose.foundation.layout.Row(
+                                            modifier = Modifier.weight(1f, fill = false),
                                             verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
                                         ) {
                                             Text(text = node.flagEmoji, style = MaterialTheme.typography.headlineSmall)
@@ -286,20 +298,27 @@ fun MainAppScaffold(
                                                     text = node.name,
                                                     color = if (isSelected) Emerald500 else Color.White,
                                                     fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                                                    style = MaterialTheme.typography.bodyMedium
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    maxLines = 1,
+                                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                                                 )
                                                 Text(
                                                     text = "${node.city} • ${node.loadPercent}% Load",
                                                     color = Slate400,
-                                                    style = MaterialTheme.typography.bodySmall
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    maxLines = 1,
+                                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                                                 )
                                             }
                                         }
+                                        androidx.compose.foundation.layout.Spacer(modifier = Modifier.padding(horizontal = 4.dp))
                                         Text(
                                             text = "${node.pingMs}ms",
                                             color = Emerald500,
                                             fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                                            style = MaterialTheme.typography.labelMedium
+                                            style = MaterialTheme.typography.labelMedium,
+                                            maxLines = 1,
+                                            softWrap = false
                                         )
                                     }
                                 }
@@ -314,8 +333,11 @@ fun MainAppScaffold(
                 )
             }
 
-            // 2. Multi-Profile Security & Gaming DNS Picker Modal
+            // 2. Multi-Profile Security & Gaming DNS Picker Modal (with Custom Developer DNS)
             if (showDnsPicker) {
+                var customDnsInput by remember(customDnsIp) { mutableStateOf(customDnsIp) }
+                var customDnsError by remember { mutableStateOf(false) }
+
                 AlertDialog(
                     onDismissRequest = { showDnsPicker = false },
                     containerColor = Slate900,
@@ -323,12 +345,12 @@ fun MainAppScaffold(
                     title = {
                         androidx.compose.foundation.layout.Column {
                             Text(
-                                text = "🛡️ Select Security & DNS Mode",
+                                text = "🛡️ Select Security & Dev DNS",
                                 fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
                                 color = Color.White
                             )
                             Text(
-                                text = "Customize how your tunnel filters ads, malware, or gaming ping",
+                                text = "Customize ad-blocking, gaming ping, or custom Pi-hole / corporate DNS",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = Slate400
                             )
@@ -336,9 +358,10 @@ fun MainAppScaffold(
                     },
                     text = {
                         androidx.compose.foundation.layout.Column(
+                            modifier = Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState()),
                             verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)
                         ) {
-                            DnsProfile.entries.forEach { profile ->
+                            DnsProfile.entries.filter { it != DnsProfile.CUSTOM_DEV }.forEach { profile ->
                                 val isSelected = profile == dnsProfile
                                 Surface(
                                     onClick = {
@@ -367,6 +390,67 @@ fun MainAppScaffold(
                                             color = Slate400,
                                             style = MaterialTheme.typography.bodySmall
                                         )
+                                    }
+                                }
+                            }
+
+                            // Custom Developer DNS IPv4 Entry
+                            val isCustomSelected = dnsProfile == DnsProfile.CUSTOM_DEV
+                            Surface(
+                                color = if (isCustomSelected) Emerald500.copy(alpha = 0.14f) else Slate950,
+                                shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+                                border = androidx.compose.foundation.BorderStroke(
+                                    1.dp,
+                                    if (isCustomSelected) Emerald500 else Slate800
+                                ),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                androidx.compose.foundation.layout.Column(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text(
+                                        text = "💻 Custom Developer DNS (${if (isCustomSelected) customDnsIp else "IPv4"})",
+                                        color = if (isCustomSelected) Emerald500 else Color.White,
+                                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                    OutlinedTextField(
+                                        value = customDnsInput,
+                                        onValueChange = {
+                                            customDnsInput = it
+                                            customDnsError = false
+                                        },
+                                        singleLine = true,
+                                        isError = customDnsError,
+                                        placeholder = { Text("e.g. 8.8.8.8 or 192.168.1.53", color = Slate400) },
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedBorderColor = Emerald500,
+                                            unfocusedBorderColor = Slate800,
+                                            focusedTextColor = Color.White,
+                                            unfocusedTextColor = Color.White
+                                        ),
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                    if (customDnsError) {
+                                        Text(
+                                            text = "Enter a valid IPv4 address (e.g., 8.8.8.8)",
+                                            color = Amber500,
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                    }
+                                    Button(
+                                        onClick = {
+                                            if (tunnelManager.setCustomDnsIp(customDnsInput)) {
+                                                showDnsPicker = false
+                                            } else {
+                                                customDnsError = true
+                                            }
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = Emerald500),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text("Apply Custom DNS", color = Color.Black, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
                                     }
                                 }
                             }

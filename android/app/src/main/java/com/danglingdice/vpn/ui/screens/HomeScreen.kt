@@ -12,7 +12,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.PowerSettingsNew
-import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -23,6 +22,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.danglingdice.vpn.R
@@ -39,6 +39,7 @@ fun HomeScreen(
     stats: TunnelStats,
     selectedServer: ServerNode,
     dnsProfile: DnsProfile = DnsProfile.ADGUARD_SHIELD,
+    customDnsIp: String = "8.8.8.8",
     stealthModeEnabled: Boolean = true,
     isPremiumUser: Boolean = false,
     accountToken: String = "DD-ZERO-AUTH",
@@ -69,112 +70,83 @@ fun HomeScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceBetween
     ) {
-        // Top Header
+        // Top Header: Two prominent equal-height cards
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(IntrinsicSize.Min),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.clickable { onPrivacyClick() }
+            // Left Box: Identity & Account Card
+            Surface(
+                color = Slate900,
+                shape = RoundedCornerShape(14.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Slate800),
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .clickable { onPrivacyClick() }
             ) {
-                Image(
-                    painter = painterResource(id = R.drawable.ic_logo),
-                    contentDescription = "Logo",
+                Row(
                     modifier = Modifier
-                        .size(36.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Column {
-                    Text(
-                        text = "Dangling Dice VPN",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        .padding(horizontal = 10.dp, vertical = 10.dp)
+                        .fillMaxHeight(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_logo),
+                        contentDescription = "Logo",
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(RoundedCornerShape(10.dp))
                     )
-                    Text(
-                        text = if (isPremiumUser) "👑 PRO • $accountToken" else "FREE • $accountToken ⓘ",
-                        fontSize = 12.sp,
-                        color = if (isPremiumUser) Amber500 else Emerald500,
-                        fontFamily = FontFamily.Monospace
-                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column(verticalArrangement = Arrangement.Center) {
+                        Text(
+                            text = "Dangling Dice VPN",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = if (isPremiumUser) "👑 PRO • $accountToken" else "FREE • $accountToken ⓘ",
+                            fontSize = 11.sp,
+                            color = if (isPremiumUser) Amber500 else Emerald500,
+                            fontFamily = FontFamily.Monospace,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
             }
 
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            // Right Box: Remove Ads / Pro Upgrade Button
+            Surface(
+                onClick = onUpgradePremiumClick,
+                color = if (isPremiumUser) Slate900 else Amber500,
+                shape = RoundedCornerShape(14.dp),
+                border = if (isPremiumUser) androidx.compose.foundation.BorderStroke(1.dp, Amber500.copy(alpha = 0.5f)) else null,
+                modifier = Modifier.fillMaxHeight()
             ) {
-                Surface(
-                    color = when (status) {
-                        ConnectionStatus.CONNECTED -> Emerald500.copy(alpha = 0.15f)
-                        ConnectionStatus.ERROR -> Red500.copy(alpha = 0.15f)
-                        ConnectionStatus.CONNECTING, ConnectionStatus.VERIFYING_HANDSHAKE -> Amber500.copy(alpha = 0.15f)
-                        else -> Slate800
-                    },
-                    shape = RoundedCornerShape(12.dp),
-                    border = androidx.compose.foundation.BorderStroke(
-                        1.dp,
-                        when (status) {
-                            ConnectionStatus.CONNECTED -> Emerald500.copy(alpha = 0.4f)
-                            ConnectionStatus.ERROR -> Red500.copy(alpha = 0.4f)
-                            ConnectionStatus.CONNECTING, ConnectionStatus.VERIFYING_HANDSHAKE -> Amber500.copy(alpha = 0.4f)
-                            else -> Color.Transparent
-                        }
-                    )
+                Row(
+                    modifier = Modifier
+                        .padding(horizontal = 14.dp, vertical = 12.dp)
+                        .fillMaxHeight(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Shield,
-                            contentDescription = null,
-                            tint = when (status) {
-                                ConnectionStatus.CONNECTED -> Emerald500
-                                ConnectionStatus.ERROR -> Red500
-                                ConnectionStatus.CONNECTING, ConnectionStatus.VERIFYING_HANDSHAKE -> Amber500
-                                else -> Slate400
-                            },
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = when (status) {
-                                ConnectionStatus.CONNECTED -> "VERIFIED SECURE"
-                                ConnectionStatus.VERIFYING_HANDSHAKE -> "HANDSHAKING..."
-                                ConnectionStatus.CONNECTING -> "CONNECTING..."
-                                ConnectionStatus.ERROR -> "CONNECTION ISSUE"
-                                else -> "UNPROTECTED"
-                            },
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = when (status) {
-                                ConnectionStatus.CONNECTED -> Emerald500
-                                ConnectionStatus.ERROR -> Red500
-                                ConnectionStatus.CONNECTING, ConnectionStatus.VERIFYING_HANDSHAKE -> Amber500
-                                else -> Slate400
-                            }
-                        )
-                    }
-                }
-
-                if (!isPremiumUser) {
-                    Surface(
-                        onClick = onUpgradePremiumClick,
-                        color = Amber500,
-                        shape = RoundedCornerShape(10.dp)
-                    ) {
-                        Text(
-                            text = "Remove Ads 👑",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.Black,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
-                        )
-                    }
+                    Text(
+                        text = if (isPremiumUser) "👑 PRO Active" else "Remove Ads 👑",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isPremiumUser) Amber500 else Color.Black,
+                        maxLines = 1,
+                        softWrap = false
+                    )
                 }
             }
         }
@@ -384,7 +356,7 @@ fun HomeScreen(
                         }
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = dnsProfile.subtitle,
+                            text = if (dnsProfile == DnsProfile.CUSTOM_DEV) "Custom DNS ($customDnsIp)" else dnsProfile.subtitle,
                             fontSize = 12.sp,
                             color = Emerald500
                         )
@@ -459,14 +431,14 @@ fun formatBytes(bytes: Long): String {
     if (bytes < 1024) return "$bytes B"
     val exp = (Math.log(bytes.toDouble()) / Math.log(1024.0)).toInt()
     val pre = "KMGTPE"[exp - 1]
-    return String.format("%.1f %sB", bytes / Math.pow(1024.0, exp.toDouble()), pre)
+    return String.format(java.util.Locale.US, "%.1f %sB", bytes / Math.pow(1024.0, exp.toDouble()), pre)
 }
 
 fun formatDuration(seconds: Long): String {
     val hrs = seconds / 3600
     val mins = (seconds % 3600) / 60
     val secs = seconds % 60
-    return if (hrs > 0) String.format("%02d:%02d:%02d", hrs, mins, secs) else String.format("%02d:%02d", mins, secs)
+    return if (hrs > 0) String.format(java.util.Locale.US, "%02d:%02d:%02d", hrs, mins, secs) else String.format(java.util.Locale.US, "%02d:%02d", mins, secs)
 }
 
 @androidx.compose.ui.tooling.preview.Preview(showBackground = true, backgroundColor = 0xFF020617)

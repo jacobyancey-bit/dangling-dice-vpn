@@ -74,6 +74,18 @@ class WireGuardTunnelManager(
     )
     val autoConnectWifiShield: StateFlow<Boolean> = _autoConnectWifiShield.asStateFlow()
 
+    // Developer Mode: Local LAN / localhost Bypass (Keeps 192.168.x.x, 172.16.x.x, 10.x.x.x reachable)
+    private val _allowLocalLanBypass = MutableStateFlow(
+        prefs.getBoolean("dev_allow_local_lan_bypass", true)
+    )
+    val allowLocalLanBypass: StateFlow<Boolean> = _allowLocalLanBypass.asStateFlow()
+
+    // Developer Mode: Custom DNS Server IP (Pi-hole / NextDNS / Internal Corporate DNS)
+    private val _customDnsIp = MutableStateFlow(
+        prefs.getString("dev_custom_dns_ip", "8.8.8.8") ?: "8.8.8.8"
+    )
+    val customDnsIp: StateFlow<String> = _customDnsIp.asStateFlow()
+
     // Premium Account Access Tier (Removes Ad Banner & Unlocks Pro Perks)
     private val _isPremiumUser = MutableStateFlow(
         prefs.getBoolean("is_premium_pro_tier", false)
@@ -207,6 +219,63 @@ class WireGuardTunnelManager(
         prefs.edit().putBoolean("auto_connect_wifi_shield", enabled).apply()
     }
 
+    fun setAllowLocalLanBypass(enabled: Boolean) {
+        _allowLocalLanBypass.value = enabled
+        prefs.edit().putBoolean("dev_allow_local_lan_bypass", enabled).apply()
+        if (_status.value == ConnectionStatus.CONNECTED) {
+            scope.launch(Dispatchers.IO) {
+                _statusDetail.value = if (enabled) "Applying Local LAN Bypass..." else "Applying Full-Tunnel Routing..."
+                try {
+                    DanglingApplication.instance.wireGuardBackend.setState(tunnel, Tunnel.State.DOWN, null)
+                } catch (_: Exception) {}
+                delay(350)
+                connect(_selectedServer.value)
+            }
+        }
+    }
+
+    fun setCustomDnsIp(rawIp: String): Boolean {
+        val trimmed = rawIp.trim()
+        val ipv4Regex = Regex("^((25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)\\.){3}(25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)$")
+        if (!ipv4Regex.matches(trimmed)) return false
+        _customDnsIp.value = trimmed
+        prefs.edit().putString("dev_custom_dns_ip", trimmed).apply()
+        setDnsProfile(DnsProfile.CUSTOM_DEV)
+        return true
+    }
+
+    fun getActiveDnsTarget(): String {
+        return if (_dnsProfile.value == DnsProfile.CUSTOM_DEV) {
+            _customDnsIp.value.ifBlank { "1.1.1.1" }
+        } else {
+            _dnsProfile.value.primaryDns
+        }
+    }
+
+    fun exportWireGuardConfig(): String {
+        val assignedIp = prefs.getString("last_assigned_vpn_ip", "10.8.0.2/32") ?: "10.8.0.2/32"
+        val serverPubKey = prefs.getString("last_server_public_key", _selectedServer.value.publicKey)
+            ?.takeIf { it.isNotBlank() } ?: "<CONNECT_ONCE_TO_FETCH_SERVER_KEY>"
+        val dns = getActiveDnsTarget()
+        val mtuLine = if (_stealthModeEnabled.value) "MTU = 1280\n" else ""
+        val keepalive = if (_stealthModeEnabled.value) 15 else 25
+        val allowedIps = if (_allowLocalLanBypass.value) LAN_BYPASS_ALLOWED_IPS else "0.0.0.0/0, ::/0"
+
+        return """
+            # Dangling Dice VPN — WireGuard CLI / Desktop Profile
+            # Passkey: ${_accountToken.value}
+            [Interface]
+            PrivateKey = ${clientKeyPair.privateKey.toBase64()}
+            Address = $assignedIp
+            DNS = $dns
+            ${mtuLine}[Peer]
+            PublicKey = $serverPubKey
+            Endpoint = ${_selectedServer.value.endpoint}
+            AllowedIPs = $allowedIps
+            PersistentKeepalive = $keepalive
+        """.trimIndent()
+    }
+
     fun setPremiumStatus(isPremium: Boolean) {
         _isPremiumUser.value = isPremium
         prefs.edit().putBoolean("is_premium_pro_tier", isPremium).apply()
@@ -269,11 +338,16 @@ class WireGuardTunnelManager(
 
                 val assignedIp = registration.first
                 val serverPubKey = registration.second
-                val dnsTarget = activeDns.primaryDns
+                val dnsTarget = getActiveDnsTarget()
+
+                prefs.edit()
+                    .putString("last_assigned_vpn_ip", assignedIp)
+                    .putString("last_server_public_key", serverPubKey)
+                    .apply()
 
                 _statusDetail.value = "Step 2/3: Assigned VPN IP $assignedIp. Bringing up WireGuard interface..."
 
-                // 2. Build WireGuard Configuration with Split-Tunneling, Multi-Profile DNS & Stealth Anti-DPI MTU
+                // 2. Build WireGuard Configuration with Split-Tunneling, Multi-Profile/Custom DNS, LAN Bypass & Stealth Anti-DPI MTU
                 val ifaceBuilder = Interface.Builder()
                     .parsePrivateKey(clientKeyPair.privateKey.toBase64())
                     .addAddress(com.wireguard.config.InetNetwork.parse(assignedIp))
@@ -289,10 +363,11 @@ class WireGuardTunnelManager(
                 }
 
                 val keepAliveSeconds = if (_stealthModeEnabled.value) 15 else 25
+                val allowedIps = if (_allowLocalLanBypass.value) LAN_BYPASS_ALLOWED_IPS else "0.0.0.0/0, ::/0"
                 val peerBuilder = Peer.Builder()
                     .parsePublicKey(serverPubKey)
                     .parseEndpoint(server.endpoint)
-                    .parseAllowedIPs("0.0.0.0/0, ::/0")
+                    .parseAllowedIPs(allowedIps)
                     .setPersistentKeepalive(keepAliveSeconds)
 
                 val config = Config.Builder()
@@ -378,5 +453,17 @@ class WireGuardTunnelManager(
     private fun stopStatsMonitoring() {
         statsJob?.cancel()
         _stats.value = TunnelStats(0, 0, 0)
+    }
+
+    companion object {
+        // Routes all public internet traffic + 10.8.0.0/24 WireGuard gateway through VPN
+        // while keeping local developer LANs (192.168.x.x, 172.16-31.x.x, 10.x.x.x, 127.x.x.x) directly reachable
+        private const val LAN_BYPASS_ALLOWED_IPS =
+            "0.0.0.0/5, 8.0.0.0/7, 10.8.0.0/24, 11.0.0.0/8, 12.0.0.0/6, 16.0.0.0/4, 32.0.0.0/3, " +
+                "64.0.0.0/3, 96.0.0.0/4, 112.0.0.0/5, 120.0.0.0/6, 124.0.0.0/7, 126.0.0.0/8, " +
+                "128.0.0.0/3, 160.0.0.0/5, 168.0.0.0/6, 172.0.0.0/12, 172.32.0.0/11, 172.64.0.0/10, " +
+                "172.128.0.0/9, 173.0.0.0/8, 174.0.0.0/7, 176.0.0.0/4, 192.0.0.0/9, 192.128.0.0/11, " +
+                "192.160.0.0/13, 192.169.0.0/16, 192.170.0.0/15, 192.172.0.0/14, 192.176.0.0/12, " +
+                "192.192.0.0/10, 193.0.0.0/8, 194.0.0.0/7, 196.0.0.0/6, 200.0.0.0/5, 208.0.0.0/4, 2000::/3"
     }
 }

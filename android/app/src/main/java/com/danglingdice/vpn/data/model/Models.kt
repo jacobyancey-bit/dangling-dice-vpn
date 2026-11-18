@@ -41,6 +41,12 @@ enum class DnsProfile(
         title = "👨‍👩‍👧 Family & Adult Content Blocker",
         subtitle = "Cloudflare Family Shield (1.1.1.3)",
         primaryDns = "1.1.1.3"
+    ),
+    CUSTOM_DEV(
+        id = "custom_dev",
+        title = "💻 Custom Developer DNS",
+        subtitle = "Pi-hole, NextDNS, or Corporate IP",
+        primaryDns = "8.8.8.8"
     );
 
     companion object {
@@ -137,4 +143,13 @@ data class LeakReport(
     val clientIp: String = "Detecting...",
     val isVpnSecured: Boolean = false,
     val serverNode: String = "Direct Link"
+)
+
+data class DevProbeResult(
+    val targetHost: String,
+    val resolvedIps: List<String> = emptyList(),
+    val httpStatus: String = "—",
+    val responseTimeMs: Long = 0L,
+    val tlsInfo: String = "—",
+    val error: String? = null
 )
