@@ -47,5 +47,6 @@ local.properties
 .cxx/
 *.keystore
 *.jks
+keystore.properties
 
 
