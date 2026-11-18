@@ -281,7 +281,8 @@ export default function StandaloneVpnPage() {
           <p>© 2026 Dangling Dice Studios™. Self-hosted high-performance VPN & developer infrastructure.</p>
           <div className="flex space-x-6">
             <a href="https://dangling-dice-studios.com" className="hover:text-slate-300 transition">Main Studio Website</a>
-            <a href="/privacy" className="hover:text-slate-300 transition">Privacy Policy & VpnService Disclosure</a>
+            <a href="/privacy" className="hover:text-slate-300 transition">Privacy Policy</a>
+            <a href="/terms" className="hover:text-slate-300 transition">Terms of Service</a>
             <a href="/admin" className="hover:text-slate-300 transition">SSOT Analytics</a>
           </div>
         </div>
