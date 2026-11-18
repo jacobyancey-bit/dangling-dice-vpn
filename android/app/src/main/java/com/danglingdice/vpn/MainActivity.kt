@@ -1,10 +1,12 @@
 package com.danglingdice.vpn
 
+import android.app.Activity
 import android.net.VpnService
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.verticalScroll
@@ -37,6 +39,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.danglingdice.vpn.billing.SubscriptionManager
 import com.danglingdice.vpn.data.model.ConnectionStatus
 import com.danglingdice.vpn.data.model.DnsProfile
 import com.danglingdice.vpn.data.model.ServerNode
@@ -52,11 +55,21 @@ import com.danglingdice.vpn.ui.theme.Slate800
 import com.danglingdice.vpn.ui.theme.Slate900
 import com.danglingdice.vpn.ui.theme.Slate950
 import com.danglingdice.vpn.vpn.WireGuardTunnelManager
+import com.revenuecat.purchases.CustomerInfo
+import com.revenuecat.purchases.PurchasesError
+import com.revenuecat.purchases.models.StoreTransaction
+import com.revenuecat.purchases.ui.revenuecatui.PaywallDialog
+import com.revenuecat.purchases.ui.revenuecatui.PaywallDialogOptions
+import com.revenuecat.purchases.ui.revenuecatui.PaywallListener
+import com.revenuecat.purchases.ui.revenuecatui.customercenter.CustomerCenter
 
 class MainActivity : ComponentActivity() {
 
     private val tunnelManager: WireGuardTunnelManager
         get() = DanglingApplication.instance.tunnelManager
+
+    private val subscriptionManager: SubscriptionManager
+        get() = DanglingApplication.instance.subscriptionManager
 
     private var pendingServerToConnect: ServerNode? = null
 
@@ -78,7 +91,9 @@ class MainActivity : ComponentActivity() {
         setContent {
             DanglingDiceTheme {
                 MainAppScaffold(
+                    activity = this@MainActivity,
                     tunnelManager = tunnelManager,
+                    subscriptionManager = subscriptionManager,
                     onConnectRequested = { server ->
                         val vpnIntent = VpnService.prepare(this@MainActivity)
                         if (vpnIntent != null) {
@@ -96,14 +111,18 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun MainAppScaffold(
+    activity: Activity,
     tunnelManager: WireGuardTunnelManager,
+    subscriptionManager: SubscriptionManager,
     onConnectRequested: (ServerNode) -> Unit
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
     var showLocationPicker by remember { mutableStateOf(false) }
     var showDnsPicker by remember { mutableStateOf(false) }
     var showPrivacyDialog by remember { mutableStateOf(false) }
-    var showPremiumDialog by remember { mutableStateOf(false) }
+    var showPaywallDialog by remember { mutableStateOf(false) }
+    var showCustomerCenter by remember { mutableStateOf(false) }
+    var showPlanSheet by remember { mutableStateOf(false) }
 
     val status by tunnelManager.status.collectAsState()
     val statusDetail by tunnelManager.statusDetail.collectAsState()
@@ -116,9 +135,26 @@ fun MainAppScaffold(
     val autoConnectWifiShield by tunnelManager.autoConnectWifiShield.collectAsState()
     val allowLocalLanBypass by tunnelManager.allowLocalLanBypass.collectAsState()
     val customDnsIp by tunnelManager.customDnsIp.collectAsState()
-    val isPremiumUser by tunnelManager.isPremiumUser.collectAsState()
+    val isProEntitled by subscriptionManager.isPro.collectAsState()
+    val currentOffering by subscriptionManager.currentOffering.collectAsState()
+    val billingLoading by subscriptionManager.isLoading.collectAsState()
+    val billingError by subscriptionManager.errorMessage.collectAsState()
+    val billingStatus by subscriptionManager.statusMessage.collectAsState()
+    val isPremiumUser = isProEntitled
     val accountToken by tunnelManager.accountToken.collectAsState()
     val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+
+    // Full-Screen RevenueCat Customer Center (Manage Subscription / Cancel / Refund / Restore)
+    if (showCustomerCenter) {
+        CustomerCenter(
+            modifier = Modifier.fillMaxSize(),
+            onDismiss = {
+                showCustomerCenter = false
+                subscriptionManager.refreshCustomerInfo()
+            }
+        )
+        return
+    }
 
     Scaffold(
         bottomBar = {
@@ -197,8 +233,14 @@ fun MainAppScaffold(
                     isPremiumUser = isPremiumUser,
                     accountToken = accountToken,
                     onSelectDnsProfileClick = { showDnsPicker = true },
-                    onUpgradePremiumClick = { showPremiumDialog = true },
-                    onAdBannerClick = { uriHandler.openUri("https://www.digitalocean.com") },
+                    onUpgradePremiumClick = {
+                        if (isPremiumUser) {
+                            showCustomerCenter = true
+                        } else {
+                            showPaywallDialog = true
+                        }
+                    },
+                    onAdBannerClick = { showPaywallDialog = true },
                     onPrivacyClick = { showPrivacyDialog = true },
                     onToggleConnection = {
                         if (status == ConnectionStatus.CONNECTED ||
@@ -500,7 +542,11 @@ fun MainAppScaffold(
                             Surface(
                                 onClick = {
                                     showPrivacyDialog = false
-                                    showPremiumDialog = true
+                                    if (isPremiumUser) {
+                                        showCustomerCenter = true
+                                    } else {
+                                        showPlanSheet = true
+                                    }
                                 },
                                 color = Amber500.copy(alpha = 0.15f),
                                 shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
@@ -508,7 +554,7 @@ fun MainAppScaffold(
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Text(
-                                    text = if (isPremiumUser) "👑 Status: Premium Pro Active (Tap to Manage)" else "👑 Status: Free Tier (Tap to Upgrade to Pro)",
+                                    text = if (isPremiumUser) "👑 Status: Pro Active (Open Customer Center)" else "👑 Status: Free Tier (View Plans / Restore)",
                                     color = Amber500,
                                     fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
                                     style = MaterialTheme.typography.bodySmall,
@@ -535,10 +581,50 @@ fun MainAppScaffold(
                 )
             }
 
-            // 4. Premium Account Access & Ad-Removal Upgrade Modal
-            if (showPremiumDialog) {
+            // 4. RevenueCat Native Paywall Dialog (Server-Driven Offering for `dangling_dice_vpn_pro`)
+            if (showPaywallDialog) {
+                PaywallDialog(
+                    paywallDialogOptions = PaywallDialogOptions.Builder()
+                        .setOffering(currentOffering)
+                        .setDismissRequest {
+                            showPaywallDialog = false
+                            subscriptionManager.refreshCustomerInfo()
+                        }
+                        .setListener(
+                            object : PaywallListener {
+                                override fun onPurchaseCompleted(
+                                    customerInfo: CustomerInfo,
+                                    storeTransaction: StoreTransaction
+                                ) {
+                                    subscriptionManager.applyCustomerInfo(customerInfo)
+                                    showPaywallDialog = false
+                                }
+
+                                override fun onRestoreCompleted(customerInfo: CustomerInfo) {
+                                    subscriptionManager.applyCustomerInfo(customerInfo)
+                                    if (customerInfo.entitlements[SubscriptionManager.ENTITLEMENT_PRO]?.isActive == true) {
+                                        showPaywallDialog = false
+                                    }
+                                }
+
+                                override fun onPurchaseError(error: PurchasesError) {
+                                    // Keep paywall open so RevenueCat displays inline feedback
+                                }
+                            }
+                        )
+                        .build()
+                )
+            }
+
+            // 5. Direct Product Picker & Restore Purchases Modal (`monthly`, `yearly`, `lifetime`)
+            if (showPlanSheet) {
+                val packages = remember(currentOffering) { subscriptionManager.getPlanPackages() }
+
                 AlertDialog(
-                    onDismissRequest = { showPremiumDialog = false },
+                    onDismissRequest = {
+                        showPlanSheet = false
+                        subscriptionManager.clearMessages()
+                    },
                     containerColor = Slate900,
                     titleContentColor = Color.White,
                     title = {
@@ -549,7 +635,7 @@ fun MainAppScaffold(
                                 color = Amber500
                             )
                             Text(
-                                text = "Zero-Login Hardware Passkey: $accountToken",
+                                text = "Entitlement: ${SubscriptionManager.ENTITLEMENT_PRO}",
                                 style = MaterialTheme.typography.bodySmall,
                                 fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
                                 color = Emerald500
@@ -558,46 +644,91 @@ fun MainAppScaffold(
                     },
                     text = {
                         androidx.compose.foundation.layout.Column(
+                            modifier = Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState()),
                             verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(10.dp)
                         ) {
                             Text(
-                                text = "Upgrade your hardware key to Premium Pro Access — no email or password required:",
-                                color = Slate400,
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                            Text(
-                                text = "✅ Remove All Banner Ads (100% Clean Home Screen)\n✅ Priority 2 Gbps WireGuard Port Bandwidth\n✅ Unlock All 5 Global Relay Locations\n✅ 4-Mode Threat & Gaming DNS + Stealth Anti-DPI",
+                                text = "✅ Ad-Free Home Screen\n✅ All Global Relay Locations & Priority Bandwidth\n✅ Developer Mode + Stealth Anti-DPI + Custom DNS",
                                 color = Color.White,
                                 style = MaterialTheme.typography.bodySmall
                             )
+
+                            if (packages.isNotEmpty()) {
+                                packages.forEach { pkg ->
+                                    Surface(
+                                        onClick = {
+                                            if (!billingLoading) {
+                                                subscriptionManager.purchasePackage(activity, pkg) {
+                                                    showPlanSheet = false
+                                                }
+                                            }
+                                        },
+                                        color = Slate950,
+                                        shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+                                        border = androidx.compose.foundation.BorderStroke(1.dp, Amber500.copy(alpha = 0.6f)),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        androidx.compose.foundation.layout.Row(
+                                            modifier = Modifier.padding(12.dp),
+                                            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween,
+                                            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                                        ) {
+                                            androidx.compose.foundation.layout.Column(modifier = Modifier.weight(1f)) {
+                                                Text(
+                                                    text = pkg.product.title.ifBlank { pkg.identifier.uppercase() },
+                                                    color = Color.White,
+                                                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                                                    style = MaterialTheme.typography.bodyMedium
+                                                )
+                                                Text(
+                                                    text = pkg.identifier,
+                                                    color = Slate400,
+                                                    style = MaterialTheme.typography.bodySmall
+                                                )
+                                            }
+                                            Text(
+                                                text = pkg.product.price.formatted,
+                                                color = Amber500,
+                                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                            )
+                                        }
+                                    }
+                                }
+                            } else {
+                                Text(
+                                    text = if (billingLoading) "Loading plans from RevenueCat..." else "Tap 'Open Paywall' below to view available Monthly, Yearly & Lifetime plans.",
+                                    color = Slate400,
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+
+                            billingStatus?.let {
+                                Text(text = it, color = Emerald500, style = MaterialTheme.typography.bodySmall)
+                            }
+                            billingError?.let {
+                                Text(text = it, color = Amber500, style = MaterialTheme.typography.bodySmall)
+                            }
                         }
                     },
                     dismissButton = {
-                        if (isPremiumUser) {
-                            TextButton(
-                                onClick = {
-                                    tunnelManager.setPremiumStatus(false)
-                                    showPremiumDialog = false
-                                }
-                            ) {
-                                Text("Switch to Free Tier (Test Ads)", color = Slate400)
-                            }
-                        } else {
-                            TextButton(onClick = { showPremiumDialog = false }) {
-                                Text("Keep Free Tier", color = Slate400)
-                            }
+                        TextButton(
+                            onClick = { subscriptionManager.restorePurchases() },
+                            enabled = !billingLoading
+                        ) {
+                            Text("Restore Purchases", color = Emerald500)
                         }
                     },
                     confirmButton = {
                         Button(
                             onClick = {
-                                tunnelManager.setPremiumStatus(true)
-                                showPremiumDialog = false
+                                showPlanSheet = false
+                                showPaywallDialog = true
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = Amber500)
                         ) {
                             Text(
-                                text = if (isPremiumUser) "👑 Pro Active" else "Activate Pro ($2.99/mo)",
+                                text = "Open Paywall",
                                 color = Color.Black,
                                 fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
                             )
