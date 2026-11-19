@@ -20,8 +20,8 @@ android {
         applicationId = "com.danglingdice.vpn"
         minSdk = 26
         targetSdk = 36
-        versionCode = 12
-        versionName = "1.0.3"
+        versionCode = 15
+        versionName = "1.0.6"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -49,7 +49,11 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            ndk {
+                debugSymbolLevel = "FULL"
+            }
             signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
