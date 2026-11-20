@@ -42,9 +42,8 @@ class SubscriptionManager(
         const val PRODUCT_YEARLY = "yearly"
         const val PRODUCT_LIFETIME = "lifetime"
 
-        // API Key (Currently set to RevenueCat Test Store key for development/testing;
-        // swap to your Google Play public key `goog_...` before Google Play Production release)
-        const val REVENUECAT_API_KEY = "test_HAiVNJylqtCtuqzlOSRKivhJnXO"
+        // Official RevenueCat Google Play Store Public API Key
+        const val REVENUECAT_API_KEY = "goog_IVvutPVdklVRajPOPioKrNsutuY"
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
